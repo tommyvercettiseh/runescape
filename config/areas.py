@@ -1,56 +1,56 @@
-"""
-commit.py
+from pathlib import Path
+import json
+from typing import Any
 
-Doel
-Snelle, veilige git commits maken zonder steeds alle commands te typen.
+def load_area(area_root: Path, area_path: str) -> list[int]:
+    """
+    area_path voorbeeld:
+    skills/inventory.slot_01
+    """
+    folder_part, key = area_path.split(".", 1)
+    json_path = area_root / f"{folder_part}.json"
 
-Wat het doet
-1 toont git status
-2 vraagt om commit message
-3 voert git add + git commit uit
-"""
+    if not json_path.exists():
+        raise FileNotFoundError(f"Area file niet gevonden: {json_path}")
 
-import subprocess
-import sys
+    with open(json_path, "r", encoding="utf-8") as file_handle:
+        data: dict[str, Any] = json.load(file_handle)
 
+    if key not in data:
+        raise KeyError(f"Area key '{key}' niet gevonden in {json_path}")
 
-def run_git_command(command: list[str]) -> str:
-    result = subprocess.run(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
-    if result.returncode != 0:
-        print("❌ Git error:")
-        print(result.stderr)
-        sys.exit(1)
-    return result.stdout
+    box = data[key]
+    if not (isinstance(box, list) and len(box) == 4):
+        raise ValueError(f"Ongeldige area box: {area_path}")
 
+    return [int(v) for v in box]
 
-def main() -> None:
-    print("📦 Git status:\n")
-    status = run_git_command(["git", "status"])
-    print(status)
+from pathlib import Path
+import json
+from typing import Any
 
-    if "nothing to commit" in status:
-        print("ℹ️  Niets om te committen.")
-        return
+def load_area(area_root: Path, area_path: str) -> list[int]:
+    """
+    area_path voorbeeld:
+    skills/inventory.slot_01
+    """
+    folder_part, key = area_path.split(".", 1)
+    json_path = area_root / f"{folder_part}.json"
 
-    message = input("✍️  Commit message: ").strip()
-    if not message:
-        print("❌ Commit message is verplicht.")
-        return
+    if not json_path.exists():
+        raise FileNotFoundError(f"Area file niet gevonden: {json_path}")
 
-    run_git_command(["git", "add", "."])
-    run_git_command(["git", "commit", "-m", message])
+    with open(json_path, "r", encoding="utf-8") as file_handle:
+        data: dict[str, Any] = json.load(file_handle)
 
-    print("✅ Commit gemaakt!")
+    if key not in data:
+        raise KeyError(f"Area key '{key}' niet gevonden in {json_path}")
 
-push = input("🚀 Push naar GitHub? (y/n): ").lower().strip()
-if push == "y":
-    run_git_command(["git", "push"])
-    print("🌍 Gepusht naar GitHub")
+    box = data[key]
+    if not (isinstance(box, list) and len(box) == 4):
+        raise ValueError(f"Ongeldige area box: {area_path}")
 
-if __name__ == "__main__":
-    main()
+    return [int(v) for v in box]
+print("📂 area_root:", area_root)
+print("📄 json_path:", json_path)
+print("🔑 key:", key)
