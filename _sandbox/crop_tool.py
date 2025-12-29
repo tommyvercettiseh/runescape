@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import pyautogui
 
-OUT_DIR = Path("assets/images")
+OUT_DIR = Path("assets/images") 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 WINDOW_NAME = "Crop Tool (drag met muis, ENTER=save, R=reset, ESC=quit)"
