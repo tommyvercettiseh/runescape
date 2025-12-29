@@ -1,4 +1,15 @@
-﻿import json
+﻿from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# Zorg dat project-root in sys.path staat
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+
+import json
 import time
 from pathlib import Path
 

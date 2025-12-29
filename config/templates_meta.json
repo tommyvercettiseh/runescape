@@ -71,72 +71,72 @@
     ]
   },
   "test.png": {
-    "saved_at": "2025-12-29 10:11:37",
+    "saved_at": "2025-12-29 11:19:29",
     "template": "test.png",
-    "area": "FullScreen",
+    "area": "Chat Area",
     "bot_id": 1,
     "best": {
-      "method": "TM_CCOEFF",
+      "method": "TM_CCORR",
       "vorm": 100.0,
-      "kleur": 100.0,
+      "kleur": 54.1,
       "pt": {
-        "x": 726,
-        "y": 119
+        "x": 38,
+        "y": 44
       }
     },
     "all": [
       {
-        "method": "TM_CCOEFF",
+        "method": "TM_CCORR",
         "vorm": 100.0,
-        "kleur": 100.0,
+        "kleur": 54.1,
         "pt": {
-          "x": 726,
-          "y": 119
+          "x": 38,
+          "y": 44
         }
       },
       {
-        "method": "TM_CCOEFF_NORMED",
+        "method": "TM_CCOEFF",
         "vorm": 100.0,
-        "kleur": 100.0,
+        "kleur": 16.96,
         "pt": {
-          "x": 726,
-          "y": 119
+          "x": 41,
+          "y": 8
         }
       },
       {
         "method": "TM_CCORR_NORMED",
-        "vorm": 100.0,
-        "kleur": 100.0,
+        "vorm": 97.6,
+        "kleur": 53.88,
         "pt": {
-          "x": 726,
-          "y": 119
+          "x": 9,
+          "y": 50
         }
       },
       {
         "method": "TM_SQDIFF_NORMED",
-        "vorm": 100.0,
-        "kleur": 100.0,
+        "vorm": 93.94,
+        "kleur": 54.1,
         "pt": {
-          "x": 726,
-          "y": 119
+          "x": 38,
+          "y": 44
         }
       },
       {
-        "method": "TM_CCORR",
-        "vorm": 100.0,
-        "kleur": 75.52,
+        "method": "TM_CCOEFF_NORMED",
+        "vorm": 37.83,
+        "kleur": 10.8,
         "pt": {
-          "x": 1475,
-          "y": 174
+          "x": 37,
+          "y": 3
         }
       },
       {
         "method": "TM_SQDIFF",
         "vorm": 0.0,
-        "kleur": 100.0,
+        "kleur": 54.1,
         "pt": {
-          "x": 726,
-          "y": 119
+          "x": 38,
+          "y": 44
         }
       }
     ]
