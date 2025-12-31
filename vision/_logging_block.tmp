@@ -1,0 +1,31 @@
+﻿# ============================================================
+# START LOGGING
+# ============================================================
+def _print_short(
+    image_name: str,
+    ok: bool,
+    hit: Optional[Match],
+    bot_id: int,
+    area_name: str,
+    method_name: str,
+) -> None:
+    if ok and hit:
+        print(
+            f"🟢 {image_name} found in {area_name} for bot {bot_id} | "
+            f"Vorm={int(hit.vorm)}% | Kleur={int(hit.kleur)}% | method={method_name}"
+        )
+    else:
+        print(f"🔴 {image_name} not found in {area_name} for bot {bot_id}")
+
+
+def _print_medium(base_box: List[int], box: List[int]) -> None:
+    print(f"   area_base={base_box} → area_offset={box}")
+
+
+def _print_long(hit: Optional[Match]) -> None:
+    if not hit:
+        return
+    print(f"   abs_xy=({hit.x},{hit.y}) size=({hit.width}x{hit.height})")
+# ============================================================
+# END LOGGING
+# ============================================================
