@@ -2,13 +2,13 @@
 autocommit.py
 
 Doel
-Volledig automatische git commit met datum en tijd.
+Volledig automatische git commit + push met datum en tijd.
 
 Wat het doet
 1 toont git status
 2 git add .
 3 git commit met timestamp
-4 optioneel git push
+4 git push
 """
 
 import subprocess
@@ -44,13 +44,9 @@ def main() -> None:
 
     run_git_command(["git", "add", "."])
     run_git_command(["git", "commit", "-m", message])
+    run_git_command(["git", "push"])
 
-    print(f"✅ Commit gemaakt: {message}")
-
-    push = input("🚀 Push naar GitHub? (y/n): ").lower().strip()
-    if push == "y":
-        run_git_command(["git", "push"])
-        print("🌍 Gepusht naar GitHub")
+    print(f"✅ Commit + push gedaan: {message}")
 
 
 if __name__ == "__main__":
