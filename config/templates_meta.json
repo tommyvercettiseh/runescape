@@ -1,0 +1,17 @@
+{
+  "jagex.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 85.0,
+    "min_color": 70.0
+  },
+  "WindowsLogo.png": {
+    "method": "ALL",
+    "min_shape": 85.0,
+    "min_color": 60.0
+  },
+  "GoogleKey.png": {
+    "method": "ALL",
+    "min_shape": 85.0,
+    "min_color": 60.0
+  }
+}

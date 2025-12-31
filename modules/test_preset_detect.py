@@ -1,38 +1,43 @@
 import sys
 from pathlib import Path
 
-# Zorg dat project-root in sys.path staat
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import json
+from core.paths import CONFIG_DIR
 from core.bot_offsets import load_areas
-from core.template_presets_store import load_preset
-from vision.image_recognition import detect_image, detect_image_preset
 
+from vision.image_detection import detect_one  # <- jouw vision package
+
+META = Path(CONFIG_DIR) / "templates_meta.json"
 
 def main():
+    print("ROOT:", ROOT)
+    print("CONFIG_DIR:", CONFIG_DIR)
+    print("META exists:", META.exists(), "->", META)
+
+    if META.exists():
+        meta = json.loads(META.read_text(encoding="utf-8-sig"))
+        print("META keys:", list(meta.keys()))
+    else:
+        meta = {}
+        print("META missing!")
+
     areas = load_areas()
+    print("AREA keys (first 20):", list(areas.keys())[:20])
 
-    preset = load_preset("jagex")
-    print("Loaded preset:", preset)
+    # Kies hier je test
+    template = "jagex.png"
+    area = list(areas.keys())[0]  # pakt automatisch de eerste area zodat je geen typefout maakt
 
-    print("Calling detect_image with preset...")
-    result = detect_image(
-        image_path="jagex.png",
-        area_name="FullScreen",
-        method_name=preset["method_name"],
-        vorm_drempel=preset["vorm_drempel"],
-        kleur_drempel=preset["kleur_drempel"],
-        bot_id=1,
-        areas=areas,
-    )
-    print("detect_image result:", result)
+    print("\nTEST template:", template)
+    print("TEST area:", area)
+    print("Preset for template:", meta.get(template))
 
-    print("Calling detect_image_preset shortcut...")
-    result2 = detect_image_preset("jagex", "FullScreen", bot_id=1, areas=areas)
-    print("detect_image_preset result:", result2)
-
+    hit = detect_one(template, area_name=area, bot_id=1)
+    print("\nRESULT hit:", hit)
 
 if __name__ == "__main__":
     main()
