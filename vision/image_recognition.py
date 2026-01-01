@@ -7,6 +7,7 @@ import pyautogui
 
 from core.paths import IMAGES_DIR
 from core.bot_offsets import load_areas, apply_offset
+from core.template_presets_store import load_preset
 
 METHODS = {
     "TM_CCOEFF": cv2.TM_CCOEFF,
@@ -103,3 +104,22 @@ def detect_image_timeout(image_path, area_name, method_name="TM_CCOEFF_NORMED", 
             return m
         time.sleep(float(poll_sec))
     return None
+
+# === PRESET WRAPPER START ===
+
+def detect_image_preset(image_name: str, area_name: str, bot_id: int = 1, areas=None):
+    """
+    Wrapper om detect_image te callen met presets uit config/templates_presets.json
+    """
+    preset = load_preset(image_name)
+    return detect_image(
+        image_path=image_name if image_name.lower().endswith(".png") else f"{image_name}.png",
+        area_name=area_name,
+        method_name=preset["method_name"],
+        vorm_drempel=preset["vorm_drempel"],
+        kleur_drempel=preset["kleur_drempel"],
+        bot_id=bot_id,
+        areas=areas
+    )
+# === PRESET WRAPPER END ===
+
