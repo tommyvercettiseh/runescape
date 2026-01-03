@@ -1,44 +1,74 @@
 {
-  "Info Area": [
-    0,
-    0,
-    100,
-    100
-  ],
-  "Buttons": [
-    0,
-    0,
-    100,
-    100
-  ],
-  "Object Area": [
-    0,
-    0,
-    100,
-    100
-  ],
-  "Focus Area": [
-    0,
-    0,
-    284,
-    288
-  ],
-  "Chat Area": [
-    0,
-    0,
-    100,
-    100
-  ],
-  "FullScreen": [
-    0,
-    0,
-    1920,
-    1080
-  ],
-  "Test": [
-    100,
-    100,
-    200,
-    200
-  ]
+  "Info_Area": {
+    "coords": [
+      598,
+      25,
+      851,
+      195
+    ],
+    "group": "Basic"
+  },
+  "Skilling_Area": {
+    "coords": [
+      89,
+      373,
+      259,
+      427
+    ],
+    "group": "Basic"
+  },
+  "Chat_Area": {
+    "coords": [
+      85,
+      371,
+      581,
+      486
+    ],
+    "group": "Basic"
+  },
+  "Inventory_Area": {
+    "coords": [
+      626,
+      227,
+      819,
+      494
+    ],
+    "group": "default"
+  },
+  "Bot_Area": {
+    "coords": [
+      82,
+      29,
+      601,
+      368
+    ],
+    "group": "default"
+  },
+  "Bot_Area_Full": {
+    "coords": [
+      82,
+      29,
+      845,
+      531
+    ],
+    "group": "default"
+  },
+  "Buttons_Top": {
+    "coords": [
+      605,
+      189,
+      844,
+      236
+    ],
+    "group": "default"
+  },
+  "Buttons_Bottom": {
+    "coords": [
+      605,
+      483,
+      852,
+      539
+    ],
+    "group": "default"
+  }
 }

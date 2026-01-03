@@ -1,17 +1,87 @@
 {
-  "jagex.png": {
+  "XP.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 85.0,
+    "min_color": 80.0
+  },
+  "Logout_Door.png": {
     "method": "TM_CCOEFF",
-    "min_shape": 85.0,
-    "min_color": 70.0
+    "min_shape": 95.0,
+    "min_color": 95.0
   },
-  "WindowsLogo.png": {
-    "method": "ALL",
-    "min_shape": 85.0,
-    "min_color": 60.0
+  "Inventory_Selected.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
   },
-  "GoogleKey.png": {
+  "Inventory_Unselected.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Cooked_Trout.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Raw_Trout.png": {
     "method": "ALL",
-    "min_shape": 85.0,
-    "min_color": 60.0
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Login_Screen_World.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Login_Screen_Play_Now.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Login_Screen_Play_Now_Red.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Login_Screen_Ok.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Logout_ClickHereToLogout.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Cyaan.png": {
+    "method": "TM_SQDIFF_NORMED",
+    "min_shape": 0.0,
+    "min_color": 95.0
+  },
+  "Purple.png": {
+    "method": "TM_SQDIFF_NORMED",
+    "min_shape": 0.0,
+    "min_color": 95.0
+  },
+  "Cross.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Bank_Deposit.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Gold_Ore.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 93.0
+  },
+  "Iron_Ore.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 98.0
   }
 }

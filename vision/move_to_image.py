@@ -183,6 +183,7 @@ def click_image(
 #   1) move_to_image naar jagex.png in Bot_Area
 #   2) click_image op dezelfde target
 # ============================================================
+
 if __name__ == "__main__":
     import time
 
