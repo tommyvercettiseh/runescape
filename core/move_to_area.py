@@ -20,7 +20,6 @@ from core.bot_offsets import (
     BOT_OFFSETS,
 )
 
-
 # =========================
 # AREAS: cache
 # =========================

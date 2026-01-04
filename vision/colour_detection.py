@@ -20,7 +20,6 @@ from core.bot_offsets import apply_offset
 
 # ============================================================
 
-
 ANSI = {
     "groen": "\033[92m",
     "rood": "\033[91m",
@@ -28,12 +27,11 @@ ANSI = {
     "blauw": "\033[94m",
     "cyaan": "\033[96m",
     "paars": "\033[95m",
-    "area": "\033[95m",   # paars voor area
+    "area": "\033[95m",
     "reset": "\033[0m",
 }
 
-
-
+# ============================================================
 # CONFIG
 # ============================================================
 AREAS_FILE = ROOT / "config" / "areas.json"
@@ -64,7 +62,6 @@ COLOR_ALIASES = {
 
 FULLSCREEN = {"fullscreen", "screen", "full", "full_screen", "full screen"}
 
-
 # ============================================================
 # AREAS
 # ============================================================
@@ -74,7 +71,7 @@ def load_areas():
 
     try:
         data = json.loads(AREAS_FILE.read_text(encoding="utf-8-sig"))
-    except:
+    except Exception:
         return {}
 
     out = {}
@@ -90,12 +87,12 @@ def grab_area_rgb(area, bot_id=1, areas=None):
     if areas is None:
         areas = load_areas()
 
-    if area.lower() in FULLSCREEN:
+    if str(area).lower() in FULLSCREEN:
         return np.array(pyautogui.screenshot())
 
     key = None
     for k in areas:
-        if k.lower() == area.lower():
+        if k.lower() == str(area).lower():
             key = k
             break
 
@@ -108,16 +105,16 @@ def grab_area_rgb(area, bot_id=1, areas=None):
 
     return np.array(pyautogui.screenshot(region=(x1, y1, w, h)))
 
-
 # ============================================================
 # CORE
 # ============================================================
 def detect_colour(colour, area, percentage, bot_id=1, verbose=False, blur=3, areas=None):
-    colour = COLOR_ALIASES.get(colour.lower(), colour.lower())
+    colour = COLOR_ALIASES.get(str(colour).lower(), str(colour).lower())
 
     rgb = grab_area_rgb(area, bot_id=bot_id, areas=areas)
 
     if blur >= 3:
+        blur = int(blur)
         if blur % 2 == 0:
             blur += 1
         rgb = cv2.GaussianBlur(rgb, (blur, blur), 0)
@@ -136,7 +133,7 @@ def detect_colour(colour, area, percentage, bot_id=1, verbose=False, blur=3, are
         mask = m if mask is None else cv2.bitwise_or(mask, m)
 
     percent = (mask > 0).mean() * 100
-    ok = percent >= percentage
+    ok = percent >= float(percentage)
 
     if verbose:
         kleur_label = colour.capitalize()
@@ -156,6 +153,7 @@ def detect_colour(colour, area, percentage, bot_id=1, verbose=False, blur=3, are
             f"{pct}% | Min {min_pct}% | Bot = {bot_id}"
         )
 
+    return ok
 
 # ============================================================
 # TEST

@@ -7,7 +7,7 @@
   "Logout_Door.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 0.0
   },
   "Inventory_Selected.png": {
     "method": "TM_CCOEFF_NORMED",
@@ -83,5 +83,35 @@
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
     "min_color": 98.0
+  },
+  "Ok.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Close_Screen_X.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Banking_Bank_Booth.png": {
+    "method": "ALL",
+    "min_shape": 85.0,
+    "min_color": 60.0
+  },
+  "Paars.png": {
+    "method": "TM_SQDIFF_NORMED",
+    "min_shape": 0.0,
+    "min_color": 95.0
+  },
+  "Smithing_Continue_Bar.png": {
+    "method": "ALL",
+    "min_shape": 85.0,
+    "min_color": 60.0
+  },
+  "Antiban_Exclude.png": {
+    "method": "ALL",
+    "min_shape": 85.0,
+    "min_color": 60.0
   }
 }

@@ -25,6 +25,7 @@ ICON_OK = "✅"
 ICON_WARN = "⚠️"
 ICON_POS = "📍"
 ICON_MOVE = "🧭"
+ICON_RAND = "🎲"
 
 MouseButton = Literal["left", "right"]
 Point = Tuple[int, int]
@@ -47,6 +48,19 @@ class CursorMotionConfig:
 class ClickConfig:
     delay: float = 0.03
     button: MouseButton = "left"
+
+
+@dataclass(frozen=True)
+class RandomMouseConfig:
+    chance: float = 0.08              # 8% kans per call
+    max_moves: int = 2                # 1..max_moves kleine bewegingen
+    min_radius: int = 6               # minimale offset in pixels
+    max_radius: int = 80              # maximale offset in pixels
+    min_duration: float = 0.06        # korte bewegingen
+    max_duration: float = 0.22
+    pause_min: float = 0.02
+    pause_max: float = 0.12
+    verbose: bool = False
 # === END MODELS ===
 
 
@@ -66,6 +80,12 @@ def _clamp_duration(duration: float, min_duration: float) -> float:
 def _compute_steps(duration: float, fps: int, min_steps: int) -> int:
     fps = max(1, int(fps))
     return max(int(min_steps), int(duration * fps))
+
+
+def _clamp_xy(x: int, y: int, w: int, h: int) -> Point:
+    x = max(0, min(int(x), int(w) - 1))
+    y = max(0, min(int(y), int(h) - 1))
+    return (x, y)
 
 
 def _log(msg: str) -> None:
@@ -126,6 +146,63 @@ def click(
 # === END CORE LOGIC ===
 
 
+# === START RANDOM MOUSE ===
+# WAT: Soms een kleine random beweging (human jitter).
+# WAAROM: Variatie zonder dat het traag wordt.
+
+def random_mouse(
+    *,
+    cfg: RandomMouseConfig = RandomMouseConfig(),
+    controller: Optional[Controller] = None,
+) -> bool:
+    """
+    Doet soms random muisbeweging(en).
+    Returns True als er iets is gedaan, anders False.
+    """
+    if cfg.chance <= 0:
+        return False
+
+    roll = random.random()
+    if roll > float(cfg.chance):
+        return False
+
+    ctrl = controller or Controller()
+    w, h = pyautogui.size()
+
+    moves = random.randint(1, max(1, int(cfg.max_moves)))
+
+    if cfg.verbose:
+        _log(f"{ICON_RAND} random_mouse ✅ moves={moves} (roll={roll:.3f} ≤ chance={cfg.chance})")
+
+    for _ in range(moves):
+        x1, y1 = ctrl.position
+
+        radius = random.randint(int(cfg.min_radius), int(cfg.max_radius))
+        ang = random.random() * 6.283185307179586  # 2*pi
+
+        dx = int(radius * (random.uniform(0.5, 1.0)) * (1 if random.random() < 0.5 else -1))
+        dy = int(radius * (random.uniform(0.5, 1.0)) * (1 if random.random() < 0.5 else -1))
+
+        x2, y2 = _clamp_xy(x1 + dx, y1 + dy, w, h)
+
+        dur = random.uniform(float(cfg.min_duration), float(cfg.max_duration))
+        fps = random.randint(90, 165)
+
+        motion = CursorMotionConfig(
+            duration=dur,
+            fps=fps,
+            min_duration=min(0.08, dur),
+            min_steps=10
+        )
+
+        move_cursor((x2, y2), config=motion, controller=ctrl)
+
+        time.sleep(random.uniform(float(cfg.pause_min), float(cfg.pause_max)))
+
+    return True
+# === END RANDOM MOUSE ===
+
+
 # === START API ===
 # WAT: Wrapper API die primitives combineert (geen nieuwe logica).
 # WAAROM: Convenience-functies voor veelgebruikte acties zonder duplicatie.
@@ -136,11 +213,21 @@ def move_and_click(
     motion: CursorMotionConfig = CursorMotionConfig(),
     click_cfg: ClickConfig = ClickConfig(),
     controller: Optional[Controller] = None,
+    rand_cfg: Optional[RandomMouseConfig] = RandomMouseConfig(),  # zet op None om uit te zetten
+    rand_before: bool = True,
 ) -> Point:
     """Beweeg naar pos en klik. Returns eindpositie."""
     ctrl = controller or Controller()
+
+    if rand_cfg is not None and rand_before:
+        random_mouse(cfg=rand_cfg, controller=ctrl)
+
     end_pos = move_cursor(pos, config=motion, controller=ctrl)
     click(config=click_cfg, controller=ctrl)
+
+    if rand_cfg is not None and not rand_before:
+        random_mouse(cfg=rand_cfg, controller=ctrl)
+
     return end_pos
 # === END API ===
 
@@ -154,14 +241,17 @@ if __name__ == "__main__":
     time.sleep(2)
 
     w, h = pyautogui.size()
-
-    # Dynamische margin zodat het op kleine schermen ook werkt
     margin = max(20, min(w, h) // 10)
 
     motion = CursorMotionConfig(duration=0.55, fps=144)
     ctrl = Controller()
 
     _log(f"{ICON_ACTION} Scherm: {w}x{h} | margin={margin}")
+
+    # test random_mouse een paar keer
+    rm = RandomMouseConfig(chance=1.0, max_moves=2, max_radius=60, verbose=True)
+    random_mouse(cfg=rm, controller=ctrl)
+
     for i in range(4):
         p = (random.randint(margin, w - margin), random.randint(margin, h - margin))
         _log(f"{ICON_MOVE} Move {i+1}/4 → {ICON_POS} {p}")
