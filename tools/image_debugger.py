@@ -39,8 +39,6 @@ from core.bot_offsets import apply_offset, load_areas
 
 # ============================================================
 # OPENCV METHODS
-# WAT: MatchTemplate methodes.
-# WAAROM: Je wil kunnen vergelijken welke methode het best scoort.
 # ============================================================
 METHODS = {
     "TM_CCOEFF": cv2.TM_CCOEFF,
@@ -52,15 +50,27 @@ METHODS = {
 }
 
 META_FILE = Path(CONFIG_DIR) / "templates_meta.json"
+DEBUG_META_FILE = Path(CONFIG_DIR) / "templates_meta_debugger.json"
 
 # ============================================================
 # FILES / STORAGE
-# WAT: Templates + presets opslaan/lezen.
-# WAAROM: Jij wil per template je eigen thresholds kunnen bewaren.
 # ============================================================
 def ensure_directories():
     Path(IMAGES_DIR).mkdir(parents=True, exist_ok=True)
     Path(CONFIG_DIR).mkdir(parents=True, exist_ok=True)
+
+
+def ensure_debug_meta_exists():
+    """
+    Debug meta wordt automatisch gemaakt als kopie van templates_meta.json.
+    Dit houdt risico laag: je main file blijft exact zoals je scripts verwachten.
+    """
+    if DEBUG_META_FILE.exists():
+        return
+    if META_FILE.exists():
+        _safe_write_json(DEBUG_META_FILE, _safe_read_json(META_FILE))
+    else:
+        _safe_write_json(DEBUG_META_FILE, {})
 
 
 def human_datetime(ts):
@@ -94,25 +104,46 @@ def _safe_write_json(path: Path, data):
 
 
 def load_all_metadata():
+    """
+    Debugger gebruikt altijd de debugger-meta (met area).
+    Bestaat die nog niet, dan valt hij terug op META_FILE.
+    """
+    if DEBUG_META_FILE.exists():
+        return _safe_read_json(DEBUG_META_FILE)
     return _safe_read_json(META_FILE)
 
 
 def save_template_metadata(template_name, settings_dict):
-    meta = _safe_read_json(META_FILE)
-    meta[template_name] = settings_dict
-    _safe_write_json(META_FILE, meta)
+    """
+    Dual save:
+    META_FILE: alleen thresholds/method (GEEN area)
+    DEBUG_META_FILE: thresholds/method + area
+    """
+    main_dict = dict(settings_dict)
+    main_dict.pop("area", None)
+
+    meta_main = _safe_read_json(META_FILE)
+    meta_main[template_name] = main_dict
+    _safe_write_json(META_FILE, meta_main)
+
+    meta_dbg = _safe_read_json(DEBUG_META_FILE)
+    meta_dbg[template_name] = settings_dict
+    _safe_write_json(DEBUG_META_FILE, meta_dbg)
 
 
 def delete_template_metadata(template_name):
-    meta = _safe_read_json(META_FILE)
-    if template_name in meta:
-        meta.pop(template_name, None)
-        _safe_write_json(META_FILE, meta)
+    meta_main = _safe_read_json(META_FILE)
+    if template_name in meta_main:
+        meta_main.pop(template_name, None)
+        _safe_write_json(META_FILE, meta_main)
+
+    meta_dbg = _safe_read_json(DEBUG_META_FILE)
+    if template_name in meta_dbg:
+        meta_dbg.pop(template_name, None)
+        _safe_write_json(DEBUG_META_FILE, meta_dbg)
 
 # ============================================================
 # IMAGE HELPERS
-# WAT: Template lezen, screenshot area pakken, scores berekenen.
-# WAAROM: Alles consistent houden: RGB + Gray + score normalisatie.
 # ============================================================
 def read_template_rgb_gray(path: Path):
     bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
@@ -199,8 +230,6 @@ def _crop_rgb(img_rgb, x1, y1, x2, y2):
 
 # ============================================================
 # MODELS
-# WAT: Data struct voor UI list + per-template settings.
-# WAAROM: Minder losse dicts, meer consistent gedrag.
 # ============================================================
 @dataclass
 class TemplateRow:
@@ -215,6 +244,7 @@ class TemplateSettings:
     method: str = "ALL"
     min_shape: float = 85.0
     min_color: float = 60.0
+    area: str = ""
 
     @staticmethod
     def from_dict(d):
@@ -222,28 +252,26 @@ class TemplateSettings:
             method=str(d.get("method", "ALL")),
             min_shape=float(d.get("min_shape", 85.0)),
             min_color=float(d.get("min_color", 60.0)),
+            area=str(d.get("area", "")) if d.get("area") is not None else "",
         )
 
     def to_dict(self):
-        return {"method": self.method, "min_shape": self.min_shape, "min_color": self.min_color}
+        out = {"method": self.method, "min_shape": self.min_shape, "min_color": self.min_color}
+        if self.area:
+            out["area"] = self.area
+        return out
 
 # ============================================================
 # APP
-# WAT: GUI tool om templates te maken + match debuggen.
-# WAAROM: Jij wil snel screenshots maken en zien waarom detect wel/niet matcht.
 # ============================================================
 class ImageDebugger(tk.Tk):
     def __init__(self, verbose=False):
         super().__init__()
         ensure_directories()
+        ensure_debug_meta_exists()
 
         self.verbose = verbose
 
-        # ============================================================
-        # WINDOW SETUP
-        # WAT: Basis window settings.
-        # WAAROM: Voelt stabiel en voorspelbaar.
-        # ============================================================
         self.title("🧪 Image Debugger")
         self.geometry("1280x760")
         self.minsize(1100, 680)
@@ -251,12 +279,9 @@ class ImageDebugger(tk.Tk):
         if self.verbose:
             print("ℹ️ IMAGES_DIR:", str(IMAGES_DIR))
             print("ℹ️ AREAS_FILE:", str(AREAS_FILE))
+            print("ℹ️ META_FILE:", str(META_FILE))
+            print("ℹ️ DEBUG_META_FILE:", str(DEBUG_META_FILE))
 
-        # ============================================================
-        # STATE
-        # WAT: App-state voor templates, areas, caches.
-        # WAAROM: UI moet snel reageren en geen dubbele windows openen.
-        # ============================================================
         self.areas = {}
         self.templates = []
         self.template_metadata = load_all_metadata()
@@ -273,23 +298,15 @@ class ImageDebugger(tk.Tk):
 
         self.auto_analyze_on_select = tk.BooleanVar(value=True)
 
-        # lens (zoom helper)
         self.lens_enabled = tk.BooleanVar(value=True)
         self.lens_zoom = tk.IntVar(value=8)
 
-        # caches
         self._last_analysis = {}
         self._thumb_cache = {}
         self._template_preview_cache = {}
 
-        # guard: voorkom dubbele screenshot tool
         self._screenshot_open = False
 
-        # ============================================================
-        # BUILD + LOAD
-        # WAT: UI bouwen + data laden.
-        # WAAROM: App is meteen bruikbaar bij start.
-        # ============================================================
         self._build_ui()
         self._load_areas()
         self._scan_templates()
@@ -298,27 +315,15 @@ class ImageDebugger(tk.Tk):
         self._load_selected_template_settings_into_ui()
         self._update_code_snippets()
 
-        # ============================================================
-        # GLOBAL HOTKEYS (F8/F9)
-        # WAT: Windows RegisterHotKey (geen focus nodig).
-        # WAAROM: Jij wil testen zonder gedoe: F8 = Screenshot, F9 = Analyze.
-        # ============================================================
         self._hotkey_stop = threading.Event()
         self._hotkey_thread = threading.Thread(target=self._win_hotkey_loop, daemon=True)
         self._hotkey_thread.start()
 
-        # UI events die snippets moeten refreshen
         self.area_cb.bind("<<ComboboxSelected>>", lambda e: self._update_code_snippets())
         self.bot_id.trace_add("write", lambda *_: self._update_code_snippets())
 
-        # netjes sluiten
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-    # ============================================================
-    # GLOBAL HOTKEY LOOP
-    # WAT: OS-wide hotkeys.
-    # WAAROM: Werkt beter dan hooks bij focus/rightclick menus.
-    # ============================================================
     def _win_hotkey_loop(self):
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
@@ -358,11 +363,6 @@ class ImageDebugger(tk.Tk):
             if ok_f9:
                 user32.UnregisterHotKey(None, HOTKEY_F9)
 
-    # ============================================================
-    # UI BUILD
-    # WAT: Layout links templates, rechts analyze, onder gallery.
-    # WAAROM: Snelle workflow: select template -> analyze -> kopieer code.
-    # ============================================================
     def _build_ui(self):
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=0)
@@ -380,7 +380,6 @@ class ImageDebugger(tk.Tk):
         bottom.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 8))
         bottom.grid_columnconfigure(0, weight=1)
 
-        # LEFT
         left.grid_columnconfigure(0, weight=1)
         left.grid_rowconfigure(2, weight=1)
 
@@ -423,7 +422,6 @@ class ImageDebugger(tk.Tk):
         ttk.Button(btns, text="💾 Save preset", command=self._save_current_template_settings).pack(side="left", padx=(0, 6))
         ttk.Button(btns, text="🔁 Refresh", command=self._refresh_all).pack(side="left")
 
-        # RIGHT
         right.grid_columnconfigure(0, weight=1)
         right.grid_rowconfigure(3, weight=1)
 
@@ -476,7 +474,6 @@ class ImageDebugger(tk.Tk):
         ttk.Button(actions, text="📋 Copy table", command=self._copy_results_table).pack(side="left")
         ttk.Checkbutton(actions, text="Auto analyze", variable=self.auto_analyze_on_select).pack(side="left", padx=(10, 0))
 
-        # Results table
         res_box = ttk.LabelFrame(right, text="Resultaten (dubbelklik = methode selecteren)")
         res_box.grid(row=3, column=0, sticky="nsew", padx=4, pady=(0, 6))
         res_box.grid_columnconfigure(0, weight=1)
@@ -505,11 +502,6 @@ class ImageDebugger(tk.Tk):
 
         self.res_tree.bind("<Double-1>", self._on_results_double_click)
 
-        # ============================================================
-        # CODE SNIPPETS
-        # WAT: 3 losse blokken die je kan dubbelklikken om te kopiëren.
-        # WAAROM: Jij wil 0 typen, gewoon plakken.
-        # ============================================================
         code_box = ttk.LabelFrame(right, text="Code snippets (dubbelklik = kopiëren)")
         code_box.grid(row=4, column=0, sticky="ew", padx=4, pady=(0, 6))
         code_box.grid_columnconfigure(0, weight=1)
@@ -536,7 +528,6 @@ class ImageDebugger(tk.Tk):
         self.snip_click_right = make_snip(code_box, "click_image right")
         self.snip_click_left = make_snip(code_box, "click_image left")
 
-        # bottom gallery
         gal = ttk.Frame(bottom)
         gal.grid(row=0, column=0, sticky="ew", padx=6, pady=6)
         gal.grid_columnconfigure(0, weight=1)
@@ -557,11 +548,6 @@ class ImageDebugger(tk.Tk):
         self.gal_canvas.itemconfig(self._gal_win, height=self.gal_inner.winfo_reqheight())
         self.gal_canvas.configure(height=min(230, max(160, self.gal_inner.winfo_reqheight() + 10)))
 
-    # ============================================================
-    # CLIPBOARD / SNIPPETS
-    # WAT: Per snippet dubbelklik kopieert alleen dat blok.
-    # WAAROM: Jij wil geen 3-in-1 clipboard spam.
-    # ============================================================
     def _copy_text(self, text: str):
         try:
             self.clipboard_clear()
@@ -598,11 +584,6 @@ class ImageDebugger(tk.Tk):
         self._set_snippet_box(self.snip_click_right, s2)
         self._set_snippet_box(self.snip_click_left, s3)
 
-    # ============================================================
-    # DATA LOAD
-    # WAT: Areas laden + templates scannen.
-    # WAAROM: UI dropdown + lijst vullen.
-    # ============================================================
     def _load_areas(self):
         try:
             self.areas = load_areas(verbose=False)
@@ -664,11 +645,6 @@ class ImageDebugger(tk.Tk):
         sel = self.tree.selection()
         return sel[0] if sel else ""
 
-    # ============================================================
-    # TEMPLATE SELECT FLOW
-    # WAT: Preview + settings laden + (optioneel) auto analyze.
-    # WAAROM: 1 klik = alles up-to-date.
-    # ============================================================
     def _on_template_selected(self):
         self._update_template_preview()
         self._load_selected_template_settings_into_ui()
@@ -701,6 +677,7 @@ class ImageDebugger(tk.Tk):
             method=str(self.method_var.get() or "ALL"),
             min_shape=float(self.minimum_shape_score.get()),
             min_color=float(self.minimum_color_score.get()),
+            area=str(self.area_var.get() or ""),
         )
 
     def _load_selected_template_settings_into_ui(self):
@@ -715,6 +692,9 @@ class ImageDebugger(tk.Tk):
         self.minimum_shape_score.set(s.min_shape)
         self.minimum_color_score.set(s.min_color)
 
+        if s.area and s.area in (self.areas or {}):
+            self.area_var.set(s.area)
+
     def _save_current_template_settings(self):
         t = self._selected_template_name()
         if not t:
@@ -723,7 +703,7 @@ class ImageDebugger(tk.Tk):
         save_template_metadata(t, s.to_dict())
         self.template_metadata = load_all_metadata()
         self._refresh_template_tree()
-        messagebox.showinfo("✅ Saved", f"{t}\n→ {META_FILE}")
+        messagebox.showinfo("✅ Saved", f"{t}\n→ {META_FILE.name} + {DEBUG_META_FILE.name}")
 
     def _on_results_double_click(self, _event=None):
         sel = self.res_tree.selection()
@@ -740,11 +720,6 @@ class ImageDebugger(tk.Tk):
         self.method_var.set(method)
         self.after(50, self._analyze)
 
-    # ============================================================
-    # DELETE / RENAME
-    # WAT: Bestanden beheren in IMAGES_DIR + metadata syncen.
-    # WAAROM: Geen rommel, alles netjes.
-    # ============================================================
     def _delete_template(self):
         current = self._selected_template_name()
         if not current:
@@ -779,13 +754,16 @@ class ImageDebugger(tk.Tk):
         try:
             os.rename(old_path, new_path)
 
-            old_meta = (self.template_metadata or {}).get(current)
-            if old_meta:
-                save_template_metadata(new, TemplateSettings.from_dict(old_meta).to_dict())
-                meta = _safe_read_json(META_FILE)
-                if current in meta:
-                    meta.pop(current, None)
-                    _safe_write_json(META_FILE, meta)
+            main_meta = _safe_read_json(META_FILE)
+            dbg_meta = _safe_read_json(DEBUG_META_FILE)
+
+            if current in main_meta:
+                main_meta[new] = main_meta.pop(current)
+                _safe_write_json(META_FILE, main_meta)
+
+            if current in dbg_meta:
+                dbg_meta[new] = dbg_meta.pop(current)
+                _safe_write_json(DEBUG_META_FILE, dbg_meta)
 
             self._refresh_all()
             if self.tree.exists(new):
@@ -794,11 +772,6 @@ class ImageDebugger(tk.Tk):
         except Exception as e:
             messagebox.showerror("Rename", str(e))
 
-    # ============================================================
-    # AREA OVERLAY
-    # WAT: Tekent area als overlay op je scherm.
-    # WAAROM: Sneller debuggen: “staat mijn area wel goed?”
-    # ============================================================
     def _show_area_overlay(self):
         area = self.area_var.get()
         if area not in self.areas:
@@ -822,11 +795,6 @@ class ImageDebugger(tk.Tk):
         except Exception as e:
             messagebox.showerror("Overlay", str(e))
 
-    # ============================================================
-    # RESULTS TABLE HELPERS
-    # WAT: Resultaten tonen + kopiëren.
-    # WAAROM: Je wil snel vergelijken en delen/plakken.
-    # ============================================================
     def _clear_results_table(self):
         for iid in self.res_tree.get_children():
             self.res_tree.delete(iid)
@@ -858,11 +826,6 @@ class ImageDebugger(tk.Tk):
         self._copy_text(text)
         messagebox.showinfo("📋 Copied", "Tabel staat in je clipboard 🙂")
 
-    # ============================================================
-    # ANALYZE
-    # WAT: Match template in gekozen area (1 of alle methodes).
-    # WAAROM: Debuggen waarom detect_image soms faalt.
-    # ============================================================
     def _analyze(self):
         template_name = self._selected_template_name()
         if not template_name:
@@ -1003,11 +966,6 @@ class ImageDebugger(tk.Tk):
 
         w.geometry(f"{pil.size[0]}x{pil.size[1]}+80+80")
 
-    # ============================================================
-    # SCREENSHOT TOOL (F8)
-    # WAT: Maak template door regio te selecteren (met zoom + lens).
-    # WAAROM: Een “hele screen” template is waardeloos, dus selectie blijft nodig.
-    # ============================================================
     def _open_screenshot_tool_safe(self):
         if self._screenshot_open:
             return
@@ -1154,7 +1112,9 @@ class ImageDebugger(tk.Tk):
                 region.save(out_path)
 
                 if new_name not in (self.template_metadata or {}):
-                    save_template_metadata(new_name, TemplateSettings().to_dict())
+                    area_now = str(self.area_var.get() or "")
+                    s = TemplateSettings(area=area_now)
+                    save_template_metadata(new_name, s.to_dict())
 
                 self._refresh_all()
                 if self.tree.exists(new_name):
@@ -1267,11 +1227,6 @@ class ImageDebugger(tk.Tk):
         win.focus_force()
         render_image()
 
-    # ============================================================
-    # CLEAN EXIT
-    # WAT: Stop hotkey thread netjes + sluit UI.
-    # WAAROM: Geen ghost hotkeys / rare states.
-    # ============================================================
     def _on_close(self):
         try:
             self._hotkey_stop.set()
@@ -1280,22 +1235,6 @@ class ImageDebugger(tk.Tk):
         self.destroy()
 
 
-# ============================================================
-# === START TEST ===
-# WAT: Snelle lokale sanity-check voor je workflow.
-# WAAROM: Jij wil direct kunnen testen: F8 screenshot, F9 analyze.
-#
-# Gebruik:
-# 1) Start tool
-# 2) Selecteer template + area + bot
-# 3) Druk F9 voor Analyze
-# 4) Dubbelklik op snippet om te kopiëren
-#
-# Voorbeeld output snippets:
-#   detect_image("xp.png", "Info_Area", bot_id=1, verbose=True)
-#   click_image("Cyaan", "Bot_Area", 1, button="right", verbose=True)
-#   click_image("xxxx", "YYY_Area", 1, verbose=True)  # links (default)
-# ============================================================
 if __name__ == "__main__":
     app = ImageDebugger(verbose=False)
     app.mainloop()

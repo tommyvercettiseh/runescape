@@ -97,8 +97,6 @@ is_skilling_status = is_skilling(bot_id=BOT_ID, verbose=VERBOSE)
 print(f"Skilling Status: {is_skilling_status}")
 
 
-assist_login(bot_id=BOT_ID, timeout=15.0, verbose=VERBOSE)
-
 if detect_image("XP.png", "Info_Area", bot_id=BOT_ID, verbose="short"):
     print("Image found 🟢🖼️")
 else:

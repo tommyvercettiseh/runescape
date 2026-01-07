@@ -89,7 +89,16 @@
     ],
     "group": "default"
   },
-  "NieuwGebied_1": {
+  "Run_Energy": {
+    "coords": [
+      611,
+      144,
+      637,
+      165
+    ],
+    "group": "default"
+  },
+  "NieuwGebied_2": {
     "coords": [
       100,
       100,
@@ -98,12 +107,21 @@
     ],
     "group": "default"
   },
-  "Run_Energy": {
+  "Tab_Confirmation_Area": {
     "coords": [
-      611,
-      144,
-      637,
-      165
+      605,
+      192,
+      850,
+      534
+    ],
+    "group": "default"
+  },
+  "Compass_Area": {
+    "coords": [
+      628,
+      36,
+      655,
+      60
     ],
     "group": "default"
   }

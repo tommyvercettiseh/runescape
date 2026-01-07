@@ -117,76 +117,91 @@
   "Tab_Equipment.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 85.0
+    "min_color": 85.0,
+    "area": "Buttons_Top"
   },
   "Tab_Equipment_Confirm.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 80.0
+    "min_color": 80.0,
+    "area": "Inventory_Area"
   },
   "Tab_Fight.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 95.0,
+    "area": "Buttons_Top"
   },
   "Tab_Fight_Confirm.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 91.0
+    "min_color": 91.0,
+    "area": "Tab_Confirmation_Area"
   },
   "Tab_Prayer.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 90.0
+    "min_color": 90.0,
+    "area": "Buttons_Top"
   },
   "Tab_Prayer_Confirm.png": {
     "method": "TM_CCOEFF",
     "min_shape": 85.0,
-    "min_color": 60.0
+    "min_color": 60.0,
+    "area": "Tab_Confirmation_Area"
   },
   "Tab_Spellbook.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 95.0,
+    "area": "Buttons_Top"
   },
   "Tab_Spellbook_Confirm.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 90.0
+    "min_color": 90.0,
+    "area": "Tab_Confirmation_Area"
   },
   "Tab_Logout.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 91.0
+    "min_color": 91.0,
+    "area": "Buttons_Bottom"
   },
   "Tab_Logout_Confirm.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 91.0
+    "min_color": 91.0,
+    "area": "Tab_Confirmation_Area"
   },
   "Tab_Friends.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 75.0
+    "min_color": 75.0,
+    "area": "Buttons_Bottom"
   },
   "Tab_Friends_Confirm.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 95.0,
+    "area": "Tab_Confirmation_Area"
   },
   "Tab_Settings.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 90.0
+    "min_color": 90.0,
+    "area": "Buttons_Bottom"
   },
   "Tab_Settings_Confirm.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 90.0
+    "min_color": 90.0,
+    "area": "Tab_Confirmation_Area"
   },
   "Compass_North.png": {
     "method": "ALL",
     "min_shape": 85.0,
-    "min_color": 60.0
+    "min_color": 60.0,
+    "area": "Tab_Confirmation_Area"
   }
 }
