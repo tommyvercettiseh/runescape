@@ -74,16 +74,6 @@
     "min_shape": 95.0,
     "min_color": 95.0
   },
-  "Gold_Ore.png": {
-    "method": "TM_CCOEFF",
-    "min_shape": 95.0,
-    "min_color": 93.0
-  },
-  "Iron_Ore.png": {
-    "method": "TM_CCOEFF",
-    "min_shape": 95.0,
-    "min_color": 98.0
-  },
   "Ok.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
@@ -101,13 +91,8 @@
   },
   "Paars.png": {
     "method": "TM_SQDIFF_NORMED",
-    "min_shape": 0.0,
-    "min_color": 95.0
-  },
-  "Smithing_Continue_Bar.png": {
-    "method": "ALL",
-    "min_shape": 85.0,
-    "min_color": 60.0
+    "min_shape": 50.0,
+    "min_color": 100.0
   },
   "Antiban_Exclude.png": {
     "method": "ALL",
@@ -188,5 +173,130 @@
     "method": "ALL",
     "min_shape": 85.0,
     "min_color": 60.0
+  },
+  "Item_Gold_Ore.png": {
+    "method": "TM_SQDIFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 96.0
+  },
+  "Item_Iron_Ore.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 98.0
+  },
+  "Item_Tin_Ore.png": {
+    "method": "TM_SQDIFF_NORMED",
+    "min_shape": 99.0,
+    "min_color": 98.0
+  },
+  "Item_Copper_Ore.png": {
+    "method": "TM_SQDIFF_NORMED",
+    "min_shape": 99.0,
+    "min_color": 98.0
+  },
+  "Skilling_Continue_Item_Gold_Bar.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 80.0
+  },
+  "Skilling_Continue_Item_Bronze_Bar.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 80.0
+  },
+  "Item_Adamantite_Ore.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 98.0
+  },
+  "Item_Mithril_Ore.png": {
+    "method": "TM_CCORR_NORMED",
+    "min_shape": 95.0,
+    "min_color": 98.0
+  },
+  "Item_Yew_Log.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 90.0
+  },
+  "Item_Maple_Log.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 90.0
+  },
+  "Item_Oak_Log.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 90.0
+  },
+  "Empty_Slot.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 40.0,
+    "min_color": 40.0
+  },
+  "Skilling_Continue_Item_Gold_Necklace.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Chat_Area_ClickHereToContinue.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Empty_Last_Spot.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 80.0,
+    "min_color": 80.0
+  },
+  "Item_Logs.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Tab_Inventory_Confirm.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Tab_Inventory.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Item_Willow_Logs.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Item_Logs_ToDrop.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Logout_Door_2.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 90.0
+  },
+  "Tab_Chat_Game_On.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Tab_Skilling.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Tab_Skilling_Confirm.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Chat_Area_YourInventoryIsTooFull.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0
   }
 }

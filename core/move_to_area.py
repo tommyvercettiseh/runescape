@@ -123,6 +123,85 @@ def move_in_area(
     move_cursor((x, y), config=motion)
     return True
 
+def _screen_size():
+    # Windows: primary screen size
+    import ctypes
+    return (
+        int(ctypes.windll.user32.GetSystemMetrics(0)),
+        int(ctypes.windll.user32.GetSystemMetrics(1)),
+    )
+
+
+def _clamp(v, lo, hi):
+    return max(lo, min(hi, v))
+
+
+def move_outside_area(
+    area_name,
+    *,
+    bot_id=1,
+    pack=None,
+    verbose=True,
+    duration=0.55,
+    fps=144,
+    padding=6,         # padding binnen area (voor de box)
+    outside_margin=30, # hoe ver "buiten" minimaal
+    jitter=0.18,
+):
+    areas = _get_areas(pack)
+
+    area_key = str(area_name).lower()
+    area_map = {k.lower(): k for k in areas}
+    if area_key not in area_map:
+        if verbose:
+            print(f"❌ Gebied '{area_name}' niet gevonden")
+        return False
+
+    true_key = area_map[area_key]
+    x1, y1, x2, y2 = apply_offset(areas[true_key], int(bot_id))
+
+    # nette box (met padding)
+    pad = max(0, int(padding))
+    left = x1 + pad
+    top = y1 + pad
+    right = x2 - pad - 1
+    bottom = y2 - pad - 1
+
+    # scherm
+    sw, sh = _screen_size()
+    m = max(5, int(outside_margin))
+
+    # kies een zijde buiten de box
+    side = random.choice(("left", "right", "top", "bottom"))
+
+    if side == "left":
+        x = random.randint(0, _clamp(left - m, 0, sw - 1))
+        y = random.randint(_clamp(top, 0, sh - 1), _clamp(bottom, 0, sh - 1))
+
+    elif side == "right":
+        x = random.randint(_clamp(right + m, 0, sw - 1), sw - 1)
+        y = random.randint(_clamp(top, 0, sh - 1), _clamp(bottom, 0, sh - 1))
+
+    elif side == "top":
+        x = random.randint(_clamp(left, 0, sw - 1), _clamp(right, 0, sw - 1))
+        y = random.randint(0, _clamp(top - m, 0, sh - 1))
+
+    else:  # bottom
+        x = random.randint(_clamp(left, 0, sw - 1), _clamp(right, 0, sw - 1))
+        y = random.randint(_clamp(bottom + m, 0, sh - 1), sh - 1)
+
+    dur = max(0.14, float(duration) * random.uniform(1 - jitter, 1 + jitter))
+    if random.random() < 0.28:
+        dur *= random.uniform(1.2, 1.7)
+
+    if verbose:
+        ox, oy = BOT_OFFSETS.get(int(bot_id), (0, 0))
+        print(f"🖱️ OUTSIDE {true_key} -> ({x},{y}) side={side} offset ({ox},{oy}) dur={dur:.2f}s fps={fps}")
+
+    motion = CursorMotionConfig(duration=dur, fps=int(fps))
+    move_cursor((x, y), config=motion)
+    return True
+
 
 # ============================================================
 # SELF TEST

@@ -12,7 +12,8 @@
   "Inventory_Selected.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 95.0,
+    "area": "Buttons_Top"
   },
   "Inventory_Unselected.png": {
     "method": "TM_CCOEFF_NORMED",
@@ -74,16 +75,6 @@
     "min_shape": 95.0,
     "min_color": 95.0
   },
-  "Gold_Ore.png": {
-    "method": "TM_CCOEFF",
-    "min_shape": 95.0,
-    "min_color": 93.0
-  },
-  "Iron_Ore.png": {
-    "method": "TM_CCOEFF",
-    "min_shape": 95.0,
-    "min_color": 98.0
-  },
   "Ok.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
@@ -101,13 +92,9 @@
   },
   "Paars.png": {
     "method": "TM_SQDIFF_NORMED",
-    "min_shape": 0.0,
-    "min_color": 95.0
-  },
-  "Smithing_Continue_Bar.png": {
-    "method": "ALL",
-    "min_shape": 85.0,
-    "min_color": 60.0
+    "min_shape": 50.0,
+    "min_color": 100.0,
+    "area": "Bot_Area"
   },
   "Antiban_Exclude.png": {
     "method": "ALL",
@@ -203,5 +190,154 @@
     "min_shape": 85.0,
     "min_color": 60.0,
     "area": "Tab_Confirmation_Area"
+  },
+  "Item_Gold_Ore.png": {
+    "method": "TM_SQDIFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 96.0,
+    "area": "Bot_Area"
+  },
+  "Item_Iron_Ore.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 98.0
+  },
+  "Item_Tin_Ore.png": {
+    "method": "TM_SQDIFF_NORMED",
+    "min_shape": 99.0,
+    "min_color": 98.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Copper_Ore.png": {
+    "method": "TM_SQDIFF_NORMED",
+    "min_shape": 99.0,
+    "min_color": 98.0,
+    "area": "Bot_Area"
+  },
+  "Skilling_Continue_Item_Gold_Bar.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 80.0,
+    "area": "Chat_Area"
+  },
+  "Skilling_Continue_Item_Bronze_Bar.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 80.0,
+    "area": "Chat_Area"
+  },
+  "Item_Adamantite_Ore.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 98.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Mithril_Ore.png": {
+    "method": "TM_CCORR_NORMED",
+    "min_shape": 95.0,
+    "min_color": 98.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Yew_Log.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Maple_Log.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Oak_Log.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Empty_Slot.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 40.0,
+    "min_color": 40.0,
+    "area": "Inventory_Area"
+  },
+  "Skilling_Continue_Item_Gold_Necklace.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Bot_Area"
+  },
+  "Chat_Area_ClickHereToContinue.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Chat_Area"
+  },
+  "Empty_Last_Spot.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 80.0,
+    "min_color": 80.0,
+    "area": "Tab_Confirmation_Area"
+  },
+  "Item_Logs.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Tab_Inventory_Confirm.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Tab_Confirmation_Area"
+  },
+  "Tab_Inventory.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Buttons_Top"
+  },
+  "Item_Willow_Logs.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Logs_ToDrop.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Logout_Door_2.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 90.0,
+    "area": "Tab_Confirmation_Area"
+  },
+  "Tab_Chat_Game_On.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Chat_Area"
+  },
+  "Tab_Skilling.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Buttons_Top"
+  },
+  "Tab_Skilling_Confirm.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Tab_Confirmation_Area"
+  },
+  "Chat_Area_YourInventoryIsTooFull.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Chat_Area"
   }
 }

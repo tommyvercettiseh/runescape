@@ -24,7 +24,9 @@ def hold_key(key, hold_time: float = 0.2):
     keyboard.press(k)
     time.sleep(float(hold_time))
     keyboard.release(k)
-
+    
+def hold_key_range(key, min_sec, max_sec):
+    hold_key(key, random.uniform(min_sec, max_sec))
 
 def type_text(text: str, interval: float = 0.03):
     for ch in text:

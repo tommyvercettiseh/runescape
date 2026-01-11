@@ -1,10 +1,5 @@
 ﻿from __future__ import annotations
 
-# ============================================================
-# BOOTSTRAP
-# WAT: Zorgt dat imports werken vanuit je project-root.
-# WAAROM: Je wil dit script kunnen runnen vanaf elke map.
-# ============================================================
 import sys
 from pathlib import Path
 
@@ -13,11 +8,6 @@ PROJECT_ROOT = HERE.parents[1]  # Runescape/
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# ============================================================
-# IMPORTS
-# WAT: UI, screenshots, OpenCV en Windows global hotkeys.
-# WAAROM: F8 = Screenshot tool en F9 = Analyze, ook zonder focus.
-# ============================================================
 import os
 import math
 import json
@@ -37,9 +27,7 @@ from PIL import Image, ImageTk
 from core.paths import CONFIG_DIR, IMAGES_DIR, AREAS_FILE
 from core.bot_offsets import apply_offset, load_areas
 
-# ============================================================
-# OPENCV METHODS
-# ============================================================
+
 METHODS = {
     "TM_CCOEFF": cv2.TM_CCOEFF,
     "TM_CCOEFF_NORMED": cv2.TM_CCOEFF_NORMED,
@@ -52,37 +40,10 @@ METHODS = {
 META_FILE = Path(CONFIG_DIR) / "templates_meta.json"
 DEBUG_META_FILE = Path(CONFIG_DIR) / "templates_meta_debugger.json"
 
-# ============================================================
-# FILES / STORAGE
-# ============================================================
+
 def ensure_directories():
     Path(IMAGES_DIR).mkdir(parents=True, exist_ok=True)
     Path(CONFIG_DIR).mkdir(parents=True, exist_ok=True)
-
-
-def ensure_debug_meta_exists():
-    """
-    Debug meta wordt automatisch gemaakt als kopie van templates_meta.json.
-    Dit houdt risico laag: je main file blijft exact zoals je scripts verwachten.
-    """
-    if DEBUG_META_FILE.exists():
-        return
-    if META_FILE.exists():
-        _safe_write_json(DEBUG_META_FILE, _safe_read_json(META_FILE))
-    else:
-        _safe_write_json(DEBUG_META_FILE, {})
-
-
-def human_datetime(ts):
-    try:
-        return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
-    except Exception:
-        return ""
-
-
-def resolve_template_path(image_name_or_path):
-    p = Path(image_name_or_path)
-    return p if p.is_absolute() else Path(IMAGES_DIR) / image_name_or_path
 
 
 def _safe_read_json(path: Path):
@@ -103,22 +64,22 @@ def _safe_write_json(path: Path, data):
     os.replace(tmp, path)
 
 
+def ensure_debug_meta_exists():
+    if DEBUG_META_FILE.exists():
+        return
+    if META_FILE.exists():
+        _safe_write_json(DEBUG_META_FILE, _safe_read_json(META_FILE))
+    else:
+        _safe_write_json(DEBUG_META_FILE, {})
+
+
 def load_all_metadata():
-    """
-    Debugger gebruikt altijd de debugger-meta (met area).
-    Bestaat die nog niet, dan valt hij terug op META_FILE.
-    """
     if DEBUG_META_FILE.exists():
         return _safe_read_json(DEBUG_META_FILE)
     return _safe_read_json(META_FILE)
 
 
 def save_template_metadata(template_name, settings_dict):
-    """
-    Dual save:
-    META_FILE: alleen thresholds/method (GEEN area)
-    DEBUG_META_FILE: thresholds/method + area
-    """
     main_dict = dict(settings_dict)
     main_dict.pop("area", None)
 
@@ -142,9 +103,19 @@ def delete_template_metadata(template_name):
         meta_dbg.pop(template_name, None)
         _safe_write_json(DEBUG_META_FILE, meta_dbg)
 
-# ============================================================
-# IMAGE HELPERS
-# ============================================================
+
+def human_datetime(ts):
+    try:
+        return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return ""
+
+
+def resolve_template_path(image_name_or_path):
+    p = Path(image_name_or_path)
+    return p if p.is_absolute() else Path(IMAGES_DIR) / image_name_or_path
+
+
 def read_template_rgb_gray(path: Path):
     bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
     if bgr is None:
@@ -158,7 +129,7 @@ def grab_region_rgb(box_xyxy):
     x1, y1, x2, y2 = box_xyxy
     w, h = x2 - x1, y2 - y1
     img = pyautogui.screenshot(region=(x1, y1, w, h))
-    return np.array(img)  # RGB
+    return np.array(img)
 
 
 def color_score_0_100(template_rgb, patch_rgb):
@@ -228,9 +199,7 @@ def _crop_rgb(img_rgb, x1, y1, x2, y2):
         return img_rgb
     return img_rgb[y1:y2, x1:x2]
 
-# ============================================================
-# MODELS
-# ============================================================
+
 @dataclass
 class TemplateRow:
     name: str
@@ -242,16 +211,16 @@ class TemplateRow:
 @dataclass
 class TemplateSettings:
     method: str = "ALL"
-    min_shape: float = 85.0
-    min_color: float = 60.0
+    min_shape: float = 90.0
+    min_color: float = 90.0
     area: str = ""
 
     @staticmethod
     def from_dict(d):
         return TemplateSettings(
             method=str(d.get("method", "ALL")),
-            min_shape=float(d.get("min_shape", 85.0)),
-            min_color=float(d.get("min_color", 60.0)),
+            min_shape=float(d.get("min_shape", 90.0)),
+            min_color=float(d.get("min_color", 90.0)),
             area=str(d.get("area", "")) if d.get("area") is not None else "",
         )
 
@@ -261,9 +230,7 @@ class TemplateSettings:
             out["area"] = self.area
         return out
 
-# ============================================================
-# APP
-# ============================================================
+
 class ImageDebugger(tk.Tk):
     def __init__(self, verbose=False):
         super().__init__()
@@ -271,27 +238,18 @@ class ImageDebugger(tk.Tk):
         ensure_debug_meta_exists()
 
         self.verbose = verbose
-
         self.title("🧪 Image Debugger")
-        self.geometry("1280x760")
-        self.minsize(1100, 680)
-
-        if self.verbose:
-            print("ℹ️ IMAGES_DIR:", str(IMAGES_DIR))
-            print("ℹ️ AREAS_FILE:", str(AREAS_FILE))
-            print("ℹ️ META_FILE:", str(META_FILE))
-            print("ℹ️ DEBUG_META_FILE:", str(DEBUG_META_FILE))
+        self.geometry("1380x780")
+        self.minsize(1200, 700)
 
         self.areas = {}
         self.templates = []
         self.template_metadata = load_all_metadata()
 
         self.bot_id = tk.IntVar(value=1)
-        self.area_var = tk.StringVar(value="")
-        self.method_var = tk.StringVar(value="ALL")
 
-        self.minimum_shape_score = tk.DoubleVar(value=85.0)
-        self.minimum_color_score = tk.DoubleVar(value=60.0)
+        self.minimum_shape_score = tk.DoubleVar(value=90.0)
+        self.minimum_color_score = tk.DoubleVar(value=90.0)
 
         self.maximum_hits = tk.IntVar(value=30)
         self.nms_radius = tk.IntVar(value=0)
@@ -307,22 +265,26 @@ class ImageDebugger(tk.Tk):
 
         self._screenshot_open = False
 
+        # copy-template flow
+        self._clone_from_template = ""
+        self._forced_screenshot_name = ""
+
         self._build_ui()
         self._load_areas()
         self._scan_templates()
         self._refresh_template_tree()
         self._update_template_preview()
         self._load_selected_template_settings_into_ui()
-        self._update_code_snippets()
 
         self._hotkey_stop = threading.Event()
         self._hotkey_thread = threading.Thread(target=self._win_hotkey_loop, daemon=True)
         self._hotkey_thread.start()
 
-        self.area_cb.bind("<<ComboboxSelected>>", lambda e: self._update_code_snippets())
-        self.bot_id.trace_add("write", lambda *_: self._update_code_snippets())
-
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _reset_copy_flow(self):
+        self._clone_from_template = ""
+        self._forced_screenshot_name = ""
 
     def _win_hotkey_loop(self):
         user32 = ctypes.windll.user32
@@ -337,10 +299,6 @@ class ImageDebugger(tk.Tk):
 
         ok_f8 = bool(user32.RegisterHotKey(None, HOTKEY_F8, 0, VK_F8))
         ok_f9 = bool(user32.RegisterHotKey(None, HOTKEY_F9, 0, VK_F9))
-
-        if self.verbose:
-            print("✅ F8 Screenshot" if ok_f8 else "❌ F8 failed (run as admin bij admin vensters)")
-            print("✅ F9 Analyze" if ok_f9 else "❌ F9 failed (run as admin bij admin vensters)")
 
         if not (ok_f8 or ok_f9):
             return
@@ -374,9 +332,9 @@ class ImageDebugger(tk.Tk):
         left = ttk.Frame(top)
         right = ttk.Frame(top)
         top.add(left, weight=3)
-        top.add(right, weight=2)
+        top.add(right, weight=3)
 
-        bottom = ttk.LabelFrame(self, text="Methode previews (alles in 1 oogopslag)")
+        bottom = ttk.LabelFrame(self, text="Methode previews")
         bottom.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 8))
         bottom.grid_columnconfigure(0, weight=1)
 
@@ -401,10 +359,10 @@ class ImageDebugger(tk.Tk):
         self.tree.heading("kb", text="KB")
         self.tree.heading("modified", text="Gewijzigd")
 
-        self.tree.column("name", width=440, anchor="w")
+        self.tree.column("name", width=480, anchor="w")
         self.tree.column("preset", width=70, anchor="center")
         self.tree.column("kb", width=70, anchor="e")
-        self.tree.column("modified", width=140, anchor="center")
+        self.tree.column("modified", width=160, anchor="center")
 
         self.tree.grid(row=2, column=0, sticky="nsew")
         self.tree.bind("<<TreeviewSelect>>", lambda e: self._on_template_selected())
@@ -417,13 +375,14 @@ class ImageDebugger(tk.Tk):
         btns.grid(row=3, column=0, sticky="ew", pady=(6, 0))
 
         ttk.Button(btns, text="📸 Screenshot (F8)", command=self._open_screenshot_tool_safe).pack(side="left", padx=(0, 6))
+        ttk.Button(btns, text="📄 Copy template", command=self._copy_template).pack(side="left", padx=(0, 6))
         ttk.Button(btns, text="🗑️ Delete", command=self._delete_template).pack(side="left", padx=(0, 6))
         ttk.Button(btns, text="✏️ Rename", command=self._rename_template).pack(side="left", padx=(0, 6))
         ttk.Button(btns, text="💾 Save preset", command=self._save_current_template_settings).pack(side="left", padx=(0, 6))
         ttk.Button(btns, text="🔁 Refresh", command=self._refresh_all).pack(side="left")
 
         right.grid_columnconfigure(0, weight=1)
-        right.grid_rowconfigure(3, weight=1)
+        right.grid_rowconfigure(4, weight=1)
 
         prev_box = ttk.LabelFrame(right, text="Template preview")
         prev_box.grid(row=0, column=0, sticky="ew", padx=4, pady=(0, 6))
@@ -436,32 +395,57 @@ class ImageDebugger(tk.Tk):
 
         controls = ttk.LabelFrame(right, text="Test settings")
         controls.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 6))
-        controls.grid_columnconfigure(1, weight=1)
+        controls.grid_columnconfigure(0, weight=1)
 
         botrow = ttk.Frame(controls)
-        botrow.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(6, 4), padx=8)
+        botrow.grid(row=0, column=0, sticky="ew", pady=(6, 6), padx=8)
         ttk.Label(botrow, text="Bot").pack(side="left")
         for i in (1, 2, 3, 4):
             ttk.Radiobutton(botrow, text=str(i), value=i, variable=self.bot_id).pack(side="left", padx=4)
 
-        ttk.Label(controls, text="Area").grid(row=1, column=0, sticky="w", padx=8, pady=4)
-        self.area_cb = ttk.Combobox(controls, textvariable=self.area_var, values=[], width=35)
-        self.area_cb.grid(row=1, column=1, sticky="ew", padx=8, pady=4)
+        lists = ttk.Frame(controls)
+        lists.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 6))
+        lists.grid_columnconfigure(0, weight=1)
+        lists.grid_columnconfigure(1, weight=1)
 
-        ttk.Label(controls, text="Methode").grid(row=2, column=0, sticky="w", padx=8, pady=4)
-        method_values = ["ALL"] + list(METHODS.keys())
-        self.method_cb = ttk.Combobox(controls, textvariable=self.method_var, values=method_values, width=20)
-        self.method_cb.grid(row=2, column=1, sticky="w", padx=8, pady=4)
+        area_box = ttk.LabelFrame(lists, text="Areas (klik 1x)")
+        area_box.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        area_box.grid_rowconfigure(0, weight=1)
+        area_box.grid_columnconfigure(0, weight=1)
+
+        self.area_list = tk.Listbox(area_box, height=9, exportselection=False)
+        self.area_list.grid(row=0, column=0, sticky="nsew")
+        area_scroll = ttk.Scrollbar(area_box, orient="vertical", command=self.area_list.yview)
+        area_scroll.grid(row=0, column=1, sticky="ns")
+        self.area_list.configure(yscrollcommand=area_scroll.set)
+        self.area_list.bind("<<ListboxSelect>>", lambda e: self._on_area_clicked())
+
+        method_box = ttk.LabelFrame(lists, text="Methods (multi select)")
+        method_box.grid(row=0, column=1, sticky="nsew")
+        method_box.grid_rowconfigure(0, weight=1)
+        method_box.grid_columnconfigure(0, weight=1)
+
+        self.method_list = tk.Listbox(method_box, height=9, selectmode="extended", exportselection=False)
+        self.method_list.grid(row=0, column=0, sticky="nsew")
+        method_scroll = ttk.Scrollbar(method_box, orient="vertical", command=self.method_list.yview)
+        method_scroll.grid(row=0, column=1, sticky="ns")
+        self.method_list.configure(yscrollcommand=method_scroll.set)
+        self.method_list.bind("<<ListboxSelect>>", lambda e: self._on_method_clicked())
+
+        self.method_list.delete(0, "end")
+        for m in METHODS.keys():
+            self.method_list.insert("end", m)
+        self.method_list.select_set(0, "end")
 
         thr = ttk.Frame(controls)
-        thr.grid(row=3, column=0, columnspan=2, sticky="ew", padx=8, pady=(2, 8))
+        thr.grid(row=2, column=0, sticky="ew", padx=8, pady=(2, 8))
         ttk.Label(thr, text="Min shape").pack(side="left")
         ttk.Entry(thr, textvariable=self.minimum_shape_score, width=6).pack(side="left", padx=(6, 14))
         ttk.Label(thr, text="Min colour").pack(side="left")
         ttk.Entry(thr, textvariable=self.minimum_color_score, width=6).pack(side="left", padx=6)
 
         hr = ttk.Frame(controls)
-        hr.grid(row=4, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 10))
+        hr.grid(row=3, column=0, sticky="ew", padx=8, pady=(0, 10))
         ttk.Label(hr, text="Max hits").pack(side="left")
         ttk.Entry(hr, textvariable=self.maximum_hits, width=6).pack(side="left", padx=(6, 14))
         ttk.Label(hr, text="NMS radius (0=auto)").pack(side="left")
@@ -488,7 +472,7 @@ class ImageDebugger(tk.Tk):
         self.res_tree.heading("hits", text="Hits")
         self.res_tree.heading("ok", text="Ok")
 
-        self.res_tree.column("method", width=160, anchor="w")
+        self.res_tree.column("method", width=170, anchor="w")
         self.res_tree.column("hit", width=60, anchor="center")
         self.res_tree.column("shape", width=80, anchor="e")
         self.res_tree.column("colour", width=80, anchor="e")
@@ -499,34 +483,7 @@ class ImageDebugger(tk.Tk):
         res_scroll = ttk.Scrollbar(res_box, orient="vertical", command=self.res_tree.yview)
         self.res_tree.configure(yscrollcommand=res_scroll.set)
         res_scroll.grid(row=0, column=1, sticky="ns")
-
         self.res_tree.bind("<Double-1>", self._on_results_double_click)
-
-        code_box = ttk.LabelFrame(right, text="Code snippets (dubbelklik = kopiëren)")
-        code_box.grid(row=4, column=0, sticky="ew", padx=4, pady=(0, 6))
-        code_box.grid_columnconfigure(0, weight=1)
-
-        def make_snip(parent, title):
-            frame = ttk.Frame(parent)
-            frame.pack(fill="x", padx=8, pady=6)
-
-            ttk.Label(frame, text=title).pack(anchor="w")
-
-            txt = tk.Text(frame, height=2, wrap="none")
-            txt.pack(fill="x", pady=(4, 0))
-            txt.configure(state="disabled", cursor="hand2")
-
-            def on_double(_e=None):
-                val = txt.get("1.0", "end").strip()
-                if val and "Selecteer template" not in val:
-                    self._copy_text(val)
-
-            txt.bind("<Double-Button-1>", on_double)
-            return txt
-
-        self.snip_detect = make_snip(code_box, "detect_image")
-        self.snip_click_right = make_snip(code_box, "click_image right")
-        self.snip_click_left = make_snip(code_box, "click_image left")
 
         gal = ttk.Frame(bottom)
         gal.grid(row=0, column=0, sticky="ew", padx=6, pady=6)
@@ -546,7 +503,7 @@ class ImageDebugger(tk.Tk):
     def _resize_gallery(self):
         self.gal_canvas.configure(scrollregion=self.gal_canvas.bbox("all"))
         self.gal_canvas.itemconfig(self._gal_win, height=self.gal_inner.winfo_reqheight())
-        self.gal_canvas.configure(height=min(230, max(160, self.gal_inner.winfo_reqheight() + 10)))
+        self.gal_canvas.configure(height=min(240, max(160, self.gal_inner.winfo_reqheight() + 10)))
 
     def _copy_text(self, text: str):
         try:
@@ -555,46 +512,29 @@ class ImageDebugger(tk.Tk):
         except Exception:
             pass
 
-    def _set_snippet_box(self, widget: tk.Text, text: str):
-        widget.configure(state="normal")
-        widget.delete("1.0", "end")
-        widget.insert("1.0", text)
-        widget.configure(state="disabled")
+    def _selected_template_name(self):
+        sel = self.tree.selection()
+        return sel[0] if sel else ""
 
-    def _update_code_snippets(self):
-        t = self._selected_template_name()
-        area = self.area_var.get()
-        bot = int(self.bot_id.get())
+    def _get_selected_area(self):
+        sel = self.area_list.curselection()
+        if not sel:
+            return ""
+        return str(self.area_list.get(sel[0]))
 
-        if not t or not area:
-            msg = "Selecteer template + area 🙂"
-            self._set_snippet_box(self.snip_detect, msg)
-            self._set_snippet_box(self.snip_click_right, msg)
-            self._set_snippet_box(self.snip_click_left, msg)
-            return
+    def _get_selected_methods(self):
+        sels = self.method_list.curselection()
+        if not sels:
+            return list(METHODS.keys())
+        return [str(self.method_list.get(i)) for i in sels]
 
-        name_png = t if t.lower().endswith(".png") else f"{t}.png"
-        name_noext = Path(t).stem
+    def _on_area_clicked(self):
+        if self.auto_analyze_on_select.get():
+            self.after(60, self._analyze)
 
-        s1 = f'detect_image("{name_png}", "{area}", bot_id={bot}, verbose=True)'
-        s2 = f'click_image("{name_noext}", "{area}", {bot}, button="right", verbose=True)'
-        s3 = f'click_image("{name_noext}", "{area}", {bot}, verbose=True)  # links (default)'
-
-        self._set_snippet_box(self.snip_detect, s1)
-        self._set_snippet_box(self.snip_click_right, s2)
-        self._set_snippet_box(self.snip_click_left, s3)
-
-    def _load_areas(self):
-        try:
-            self.areas = load_areas(verbose=False)
-            names = sorted(self.areas.keys())
-            self.area_cb["values"] = names
-            if names and self.area_var.get() not in names:
-                self.area_var.set(names[0])
-        except Exception as e:
-            messagebox.showerror("Areas", str(e))
-            self.areas = {}
-            self.area_cb["values"] = []
+    def _on_method_clicked(self):
+        if self.auto_analyze_on_select.get():
+            self.after(60, self._analyze)
 
     def _scan_templates(self):
         self.templates = []
@@ -639,20 +579,31 @@ class ImageDebugger(tk.Tk):
         self._refresh_template_tree()
         self._update_template_preview()
         self._load_selected_template_settings_into_ui()
-        self._update_code_snippets()
 
-    def _selected_template_name(self):
-        sel = self.tree.selection()
-        return sel[0] if sel else ""
+    def _load_areas(self):
+        try:
+            self.areas = load_areas(verbose=False)
+            names = sorted(self.areas.keys())
+
+            self.area_list.delete(0, "end")
+            for n in names:
+                self.area_list.insert("end", n)
+
+            if names:
+                self.area_list.selection_clear(0, "end")
+                self.area_list.selection_set(0)
+                self.area_list.see(0)
+
+        except Exception as e:
+            messagebox.showerror("Areas", str(e))
+            self.areas = {}
+            self.area_list.delete(0, "end")
 
     def _on_template_selected(self):
         self._update_template_preview()
         self._load_selected_template_settings_into_ui()
-        self._update_code_snippets()
-
-        if not self.auto_analyze_on_select.get():
-            return
-        self.after(80, self._analyze)
+        if self.auto_analyze_on_select.get():
+            self.after(80, self._analyze)
 
     def _update_template_preview(self):
         name = self._selected_template_name()
@@ -663,7 +614,7 @@ class ImageDebugger(tk.Tk):
         try:
             path = resolve_template_path(name)
             img = Image.open(path)
-            img.thumbnail((260, 260))
+            img.thumbnail((280, 280))
             imgtk = ImageTk.PhotoImage(img)
             self._template_preview_cache["main"] = imgtk
             self.preview_label.configure(image=imgtk)
@@ -673,11 +624,13 @@ class ImageDebugger(tk.Tk):
             self.preview_text.configure(text="Preview niet beschikbaar")
 
     def _get_ui_settings(self):
+        methods = self._get_selected_methods()
+        method_value = methods[0] if len(methods) == 1 else "ALL"
         return TemplateSettings(
-            method=str(self.method_var.get() or "ALL"),
+            method=str(method_value),
             min_shape=float(self.minimum_shape_score.get()),
             min_color=float(self.minimum_color_score.get()),
-            area=str(self.area_var.get() or ""),
+            area=str(self._get_selected_area() or ""),
         )
 
     def _load_selected_template_settings_into_ui(self):
@@ -688,12 +641,28 @@ class ImageDebugger(tk.Tk):
         raw = (self.template_metadata or {}).get(t, {})
         s = TemplateSettings.from_dict(raw)
 
-        self.method_var.set(s.method)
         self.minimum_shape_score.set(s.min_shape)
         self.minimum_color_score.set(s.min_color)
 
         if s.area and s.area in (self.areas or {}):
-            self.area_var.set(s.area)
+            items = self.area_list.get(0, "end")
+            for i, name in enumerate(items):
+                if str(name) == s.area:
+                    self.area_list.selection_clear(0, "end")
+                    self.area_list.selection_set(i)
+                    self.area_list.see(i)
+                    break
+
+        self.method_list.selection_clear(0, "end")
+        if s.method == "ALL":
+            self.method_list.select_set(0, "end")
+        else:
+            items = self.method_list.get(0, "end")
+            for i, name in enumerate(items):
+                if str(name) == s.method:
+                    self.method_list.selection_set(i)
+                    self.method_list.see(i)
+                    break
 
     def _save_current_template_settings(self):
         t = self._selected_template_name()
@@ -717,7 +686,14 @@ class ImageDebugger(tk.Tk):
         if method not in METHODS:
             return
 
-        self.method_var.set(method)
+        self.method_list.selection_clear(0, "end")
+        items = self.method_list.get(0, "end")
+        for i, name in enumerate(items):
+            if str(name) == method:
+                self.method_list.selection_set(i)
+                self.method_list.see(i)
+                break
+
         self.after(50, self._analyze)
 
     def _delete_template(self):
@@ -772,8 +748,34 @@ class ImageDebugger(tk.Tk):
         except Exception as e:
             messagebox.showerror("Rename", str(e))
 
+    def _copy_template(self):
+        current = self._selected_template_name()
+        if not current:
+            return messagebox.showerror("Copy template", "Selecteer eerst een template")
+
+        base = Path(current).stem
+        new = simpledialog.askstring(
+            "Copy template",
+            "Nieuwe template naam (je gaat daarna meteen screenshotten):",
+            initialvalue=base,
+            parent=self,
+        )
+        if not new:
+            return
+        if not new.lower().endswith(".png"):
+            new += ".png"
+
+        dst = resolve_template_path(new)
+        if dst.exists():
+            return messagebox.showerror("Copy template", "Bestand bestaat al")
+
+        self._clone_from_template = current
+        self._forced_screenshot_name = new
+
+        self._open_screenshot_tool_safe()
+
     def _show_area_overlay(self):
-        area = self.area_var.get()
+        area = self._get_selected_area()
         if area not in self.areas:
             return messagebox.showerror("Area", "Selecteer een geldige area")
 
@@ -831,15 +833,15 @@ class ImageDebugger(tk.Tk):
         if not template_name:
             return
 
-        area_name = self.area_var.get()
+        area_name = self._get_selected_area()
         if not area_name or area_name not in self.areas:
             return
 
         try:
             min_shape = float(self.minimum_shape_score.get())
             min_colour = float(self.minimum_color_score.get())
-            max_hits = self.maximum_hits.get()
-            nms_radius = self.nms_radius.get()
+            max_hits = int(self.maximum_hits.get())
+            nms_radius = int(self.nms_radius.get())
         except Exception:
             return messagebox.showerror("Analyze", "Ongeldige thresholds")
 
@@ -857,20 +859,17 @@ class ImageDebugger(tk.Tk):
         if screenshot_gray.shape[0] < th or screenshot_gray.shape[1] < tw:
             return messagebox.showerror("Analyze", "Template is groter dan je area")
 
-        selected_method = str(self.method_var.get() or "ALL").strip()
-        method_names = list(METHODS.keys()) if selected_method == "ALL" else [selected_method]
-
+        method_names = self._get_selected_methods()
         minimum_score_0_1 = float(min_shape) / 100.0
         nms_radius_pixels = None if nms_radius == 0 else nms_radius
 
         self._last_analysis.clear()
         self._thumb_cache.clear()
         self._clear_results_table()
-
         for w in self.gal_inner.winfo_children():
             w.destroy()
 
-        thumb_w, thumb_h = 230, 140
+        thumb_w, thumb_h = 240, 150
 
         for method_name in method_names:
             if method_name not in METHODS:
@@ -891,10 +890,8 @@ class ImageDebugger(tk.Tk):
 
             visual = screenshot_rgb.copy()
             ok_count = 0
-
             best_shape_local = 0.0
             best_colour_local = 0.0
-            best_xy = None
 
             for x, y, score_0_1 in hits:
                 shape = float(score_0_1 * 100.0)
@@ -911,60 +908,24 @@ class ImageDebugger(tk.Tk):
                 if shape > best_shape_local:
                     best_shape_local = shape
                     best_colour_local = colour
-                    best_xy = (x, y)
 
             hit_bool = len(hits) > 0
             self._add_result_row(method_name, hit_bool, best_shape_local, best_colour_local, len(hits), ok_count)
-
-            self._last_analysis[method_name] = {
-                "visual_rgb": visual,
-                "template_wh": (tw, th),
-                "box_abs": box_abs,
-                "hits": hits,
-                "best_xy": best_xy,
-                "best_shape": best_shape_local,
-                "best_colour": best_colour_local,
-                "ok": ok_count,
-            }
 
             pil = Image.fromarray(visual).resize((thumb_w, thumb_h), Image.Resampling.NEAREST)
             imgtk = ImageTk.PhotoImage(pil)
             self._thumb_cache[method_name] = imgtk
 
             card = ttk.Frame(self.gal_inner)
-            title = f"{method_name} | Shape {best_shape_local:.1f}% | Colour {best_colour_local:.1f}% | {len(hits)} hits"
+            title = f"{method_name}  shape {best_shape_local:.1f}%  colour {best_colour_local:.1f}%  hits {len(hits)}"
             ttk.Label(card, text=title, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=6, pady=(6, 2))
 
             lbl = ttk.Label(card, image=imgtk)
             lbl.image = imgtk
             lbl.pack(padx=6, pady=(0, 6))
-            lbl.bind("<Button-1>", lambda e, m=method_name: self._open_method_popup(m))
-
             card.pack(side="left", padx=6, pady=6)
 
         self._resize_gallery()
-
-    def _open_method_popup(self, method_name):
-        info = self._last_analysis.get(method_name)
-        if not info:
-            return
-
-        visual = info["visual_rgb"]
-        w = tk.Toplevel(self)
-        w.title(f"🖼️ {method_name}")
-        w.attributes("-topmost", True)
-
-        pil = Image.fromarray(visual)
-        pil.thumbnail((1200, 800))
-
-        canvas = tk.Canvas(w, highlightthickness=0)
-        canvas.pack(fill="both", expand=True)
-
-        imgtk = ImageTk.PhotoImage(pil)
-        canvas.create_image(0, 0, image=imgtk, anchor="nw")
-        canvas.image = imgtk
-
-        w.geometry(f"{pil.size[0]}x{pil.size[1]}+80+80")
 
     def _open_screenshot_tool_safe(self):
         if self._screenshot_open:
@@ -1004,7 +965,7 @@ class ImageDebugger(tk.Tk):
 
         hint = tk.Label(
             win,
-            text="📸 Screenshot | Wheel=zoom | Space+drag=pan | Drag=select | Enter=save | Esc=cancel",
+            text="📸 Screenshot  wheel zoom  space drag pan  drag select  enter save  esc cancel",
             bg="black",
             fg="white",
             padx=12,
@@ -1093,28 +1054,62 @@ class ImageDebugger(tk.Tk):
 
                 x1, y1, x2, y2 = state["last_selection_img"]
                 if (x2 - x1) < 5 or (y2 - y1) < 5:
+                    self._reset_copy_flow()
                     return
 
                 region = screen_pil.crop((x1, y1, x2, y2))
 
-                new_name = simpledialog.askstring(
-                    "Bestandsnaam",
-                    "Naam voor template (zonder .png mag ook):",
-                    initialvalue=f"Screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                    parent=self,
-                )
-                if not new_name:
-                    return
-                if not new_name.lower().endswith(".png"):
-                    new_name += ".png"
+                forced = (self._forced_screenshot_name or "").strip()
+                if forced:
+                    new_name = forced
+                else:
+                    new_name = simpledialog.askstring(
+                        "Bestandsnaam",
+                        "Naam voor template (zonder .png mag ook):",
+                        initialvalue=f"Screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                        parent=self,
+                    )
+                    if not new_name:
+                        return
+                    if not new_name.lower().endswith(".png"):
+                        new_name += ".png"
 
                 out_path = Path(IMAGES_DIR) / new_name
+                if out_path.exists():
+                    messagebox.showerror("Opslaan", f"Bestand bestaat al:\n{new_name}")
+                    self._reset_copy_flow()
+                    return
+
                 region.save(out_path)
 
-                if new_name not in (self.template_metadata or {}):
-                    area_now = str(self.area_var.get() or "")
-                    s = TemplateSettings(area=area_now)
-                    save_template_metadata(new_name, s.to_dict())
+                if forced and self._clone_from_template:
+                    src_name = self._clone_from_template
+
+                    main_meta = _safe_read_json(META_FILE)
+                    dbg_meta = _safe_read_json(DEBUG_META_FILE)
+
+                    copied_any = False
+
+                    if src_name in main_meta:
+                        main_meta[new_name] = dict(main_meta[src_name])
+                        _safe_write_json(META_FILE, main_meta)
+                        copied_any = True
+
+                    if src_name in dbg_meta:
+                        dbg_meta[new_name] = dict(dbg_meta[src_name])
+                        _safe_write_json(DEBUG_META_FILE, dbg_meta)
+                        copied_any = True
+
+                    if not copied_any:
+                        s = self._get_ui_settings()
+                        save_template_metadata(new_name, s.to_dict())
+
+                    self._reset_copy_flow()
+                else:
+                    if new_name not in (self.template_metadata or {}):
+                        area_now = self._get_selected_area()
+                        s = TemplateSettings(area=area_now)
+                        save_template_metadata(new_name, s.to_dict())
 
                 self._refresh_all()
                 if self.tree.exists(new_name):
@@ -1127,6 +1122,7 @@ class ImageDebugger(tk.Tk):
                 lens.withdraw()
                 win.destroy()
                 self.deiconify()
+                self._reset_copy_flow()
 
         def on_key_up(e):
             if e.keysym == "space":

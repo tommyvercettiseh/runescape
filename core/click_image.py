@@ -4,19 +4,12 @@ import sys
 import random
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]  # Runescape/
+ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import cv2
-import numpy as np
-import pyautogui
-
-# ✅ BELANGRIJK: ai_cursor zit in core/
 from core.ai_cursor import move_and_click
-
-
-_TEMPLATE_INDEX_CACHE = {}
+from vision.image_detection import detect_image, detect_images
 
 
 def _normalize_png(name):
@@ -26,160 +19,295 @@ def _normalize_png(name):
     return name if name.lower().endswith(".png") else name + ".png"
 
 
-def _norm_key(s):
-    return (s or "").strip().lower().replace(" ", "_")
-
-
-def _get_template_dir():
-    # 1) als je vision.image_detection TEMPLATE_DIR hebt
-    try:
-        import vision.image_detection as v
-        d = getattr(v, "TEMPLATE_DIR", None)
-        if d and Path(d).exists():
-            return Path(d)
-    except Exception:
-        pass
-
-    # 2) als je core.paths IMAGES_DIR hebt
-    try:
-        from core.paths import IMAGES_DIR
-        if IMAGES_DIR and Path(IMAGES_DIR).exists():
-            return Path(IMAGES_DIR)
-    except Exception:
-        pass
-
-    # 3) fallback assets/images
-    p = ROOT / "assets" / "images"
-    if p.exists():
-        return p
-
-    # 4) laatste fallback
-    return ROOT / "assets" / "templates"
-
-
-def _build_template_index(template_dir):
-    idx = {}
-    if not template_dir.exists():
-        return idx
-
-    for p in template_dir.iterdir():
-        if p.is_file() and p.suffix.lower() == ".png":
-            idx[_norm_key(p.stem)] = p
-    return idx
-
-
-def _resolve_template_path(template_dir, image_name):
-    wanted = _norm_key(Path(_normalize_png(image_name)).stem)
-
-    idx = _TEMPLATE_INDEX_CACHE.get(template_dir)
-    if idx is None:
-        idx = _build_template_index(template_dir)
-        _TEMPLATE_INDEX_CACHE[template_dir] = idx
-
-    hit = idx.get(wanted)
-    if hit:
-        return hit
-
-    # refresh cache 1x (handig tijdens testen)
-    idx = _build_template_index(template_dir)
-    _TEMPLATE_INDEX_CACHE[template_dir] = idx
-    hit = idx.get(wanted)
-    if hit:
-        return hit
-
-    raise FileNotFoundError(
-        f"template niet gevonden: '{image_name}' (genorm='{wanted}') in {template_dir}"
-    )
-
-
-def _load_areas():
-    try:
-        from core.bot_offsets import load_areas
-        return load_areas()
-    except Exception:
-        pass
-
-    p = ROOT / "config" / "areas.json"
-    if not p.exists():
-        raise FileNotFoundError(f"areas.json niet gevonden: {p}")
-
-    import json
-    with open(p, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _get_area(areas, area_name):
-    wanted = (area_name or "").strip().lower()
-    for k, v in areas.items():
-        if str(k).lower() == wanted:
-            return v
-    raise KeyError(f"area bestaat niet: {area_name}")
-
-
-def _get_offset(bot_id):
-    try:
-        from core.bot_offsets import BOT_OFFSETS
-        return BOT_OFFSETS.get(int(bot_id), (0, 0))
-    except Exception:
-        return (0, 0)
-
-
-def click_image(image_name, area_name, bot_id=1, threshold=0.90, padding=2, verbose=True):
-    areas = _load_areas()
-    x1, y1, x2, y2 = _get_area(areas, area_name)
-
-    ox, oy = _get_offset(bot_id)
-    x1 += ox; y1 += oy; x2 += ox; y2 += oy
-
-    w = max(1, x2 - x1)
-    h = max(1, y2 - y1)
-
-    template_dir = _get_template_dir()
-    template_path = _resolve_template_path(template_dir, image_name)
-
-    if verbose:
-        print(f"🔍 click_image area={area_name} bot={bot_id} thr={threshold} template={template_path.name}")
-
-    shot = pyautogui.screenshot(region=(x1, y1, w, h))
-    hay_rgb = np.array(shot)
-    hay_bgr = cv2.cvtColor(hay_rgb, cv2.COLOR_RGB2BGR)
-
-    tpl_bgr = cv2.imread(str(template_path), cv2.IMREAD_COLOR)
-    if tpl_bgr is None:
-        if verbose:
-            print("❌ template niet geladen")
-        return False
-
-    th, tw = tpl_bgr.shape[:2]
-    res = cv2.matchTemplate(hay_bgr, tpl_bgr, cv2.TM_CCOEFF_NORMED)
-    _, max_val, _, max_loc = cv2.minMaxLoc(res)
-
-    if max_val < threshold:
-        if verbose:
-            print(f"⚠️ geen hit ({max_val:.3f} < {threshold})")
-        return False
-
-    bx1, by1 = max_loc
-    bx2, by2 = bx1 + tw, by1 + th
+def _rand_point_in_hit(hit, padding):
+    x = int(hit.x)
+    y = int(hit.y)
+    w = int(hit.width)
+    h = int(hit.height)
 
     pad = max(0, int(padding))
-    ix1 = bx1 + pad; iy1 = by1 + pad
-    ix2 = bx2 - pad; iy2 = by2 - pad
-    if ix2 <= ix1 or iy2 <= iy1:
-        ix1, iy1, ix2, iy2 = bx1, by1, bx2, by2
 
-    px = random.randint(ix1, max(ix1, ix2 - 1))
-    py = random.randint(iy1, max(iy1, iy2 - 1))
+    x1 = x + pad
+    y1 = y + pad
+    x2 = x + max(1, w) - pad
+    y2 = y + max(1, h) - pad
 
-    screen_x = x1 + px
-    screen_y = y1 + py
+    if x2 <= x1 or y2 <= y1:
+        x1, y1, x2, y2 = x, y, x + max(1, w), y + max(1, h)
+
+    cx = random.randint(x1, max(x1, x2 - 1))
+    cy = random.randint(y1, max(y1, y2 - 1))
+    return cx, cy
+
+
+def click_image(image_name, area_name, bot_id=1, button="left", padding=2, verbose=True):
+    img = _normalize_png(image_name)
+
+    hit = detect_image(img, area_name, bot_id=bot_id, verbose=verbose)
+    if not hit:
+        return False
+
+    cx, cy = _rand_point_in_hit(hit, padding)
 
     if verbose:
-        print(f"🖱️ click @ ({screen_x},{screen_y}) score={max_val:.3f}")
+        print(
+            f"🖱️ click_image {img} in {area_name} bot={bot_id} @ ({cx},{cy}) | "
+            f"vorm={hit.vorm:.2f} kleur={hit.kleur:.2f}"
+        )
 
-    move_and_click((screen_x, screen_y))
+    move_and_click((cx, cy), button=button)
     return True
 
 
+def click_images(
+    image_name,
+    area_name,
+    bot_id=1,
+
+    # 🧪 Test & simulatie
+    dry_run=True,           # True = geen echte clicks
+    skip_chance=0.08,       # 8% kans om over te slaan
+    seed=None,              # bv 123 voor vaste resultaten
+
+    # ⚙️ Gedrag
+    button="left",
+    padding=2,
+    verbose=True,
+    max_clicks=28,
+    pattern=None,
+    row_band_px=18,
+    exclude_slots=None,
+):
+    if seed is not None:
+        random.seed(seed)
+
+    img = _normalize_png(image_name)
+    hits = detect_images(img, area_name, bot_id=bot_id, verbose=verbose, max_hits=max_clicks)
+
+    if not hits:
+        if verbose:
+            print("⚠️ Geen hits gevonden")
+        return []
+
+    band = max(6, int(row_band_px))
+    exclude = set(exclude_slots or [])
+
+    def row_id(h):
+        return int(h.y // band)
+
+    # =========================
+    # Patronen
+    # =========================
+    def pattern_row(lr=True):
+        rows = {}
+        for h in hits:
+            rows.setdefault(row_id(h), []).append(h)
+
+        ordered = []
+        for rk in sorted(rows.keys()):
+            row_hits = sorted(rows[rk], key=lambda h: int(h.x))
+            if not lr:
+                row_hits.reverse()
+            ordered.extend(row_hits)
+        return ordered
+
+    def pattern_snake(start_lr=True):
+        rows = {}
+        for h in hits:
+            rows.setdefault(row_id(h), []).append(h)
+
+        ordered = []
+        row_keys = sorted(rows.keys())
+        for i, rk in enumerate(row_keys):
+            row_hits = sorted(rows[rk], key=lambda h: int(h.x))
+            flip = (i % 2 == 1)
+            if not start_lr:
+                flip = not flip
+            if flip:
+                row_hits.reverse()
+            ordered.extend(row_hits)
+        return ordered
+
+    PATTERNS = {
+        "row": lambda: pattern_row(lr=True),
+        "row_rev": lambda: pattern_row(lr=False),
+        "snake": lambda: pattern_snake(start_lr=True),
+        "snake_rev": lambda: pattern_snake(start_lr=False),
+    }
+
+    # =========================
+    # Kies patroon
+    # =========================
+    if pattern is None:
+        pattern_name = random.choice(list(PATTERNS.keys()))
+    else:
+        if pattern not in PATTERNS:
+            raise ValueError(f"Onbekend pattern: {pattern}")
+        pattern_name = pattern
+
+    ordered = PATTERNS[pattern_name]()
+
+    if verbose:
+        mode = "Dry run 🧪" if dry_run else "Live 🔥"
+        print(f"🧩 Start | Pattern={pattern_name} | Hits={len(ordered)} | Mode={mode}")
+
+    # =========================
+    # Stats
+    # =========================
+    clicked = []
+    skipped = 0
+    excluded = 0
+
+    # =========================
+    # Klik loop
+    # =========================
+    for idx, hit in enumerate(ordered):
+        if idx in exclude:
+            excluded += 1
+            if verbose:
+                print(f"⏭️ Excluded | Index={idx}")
+            continue
+
+        # 🙈 Skip simulatie
+        if random.random() < float(skip_chance):
+            skipped += 1
+            if verbose:
+                print(f"🙈 Skipped | Index={idx}")
+            continue
+
+        x = int(hit.x)
+        y = int(hit.y)
+        w = int(hit.width)
+        hgt = int(hit.height)
+
+        pad = max(0, int(padding))
+        x1 = x + pad
+        y1 = y + pad
+        x2 = x + max(1, w) - pad
+        y2 = y + max(1, hgt) - pad
+
+        if x2 <= x1 or y2 <= y1:
+            x1, y1, x2, y2 = x, y, x + w, y + hgt
+
+        cx = random.randint(x1, max(x1, x2 - 1))
+        cy = random.randint(y1, max(y1, y2 - 1))
+
+        if verbose:
+            print(f"🖱️ Target | Index={idx} | Pos=({cx},{cy}) | Vorm={hit.vorm:.2f} | Kleur={hit.kleur:.2f}")
+
+        if dry_run:
+            if verbose:
+                print("🧪 Dry run | Geen echte click uitgevoerd")
+        else:
+            move_and_click((cx, cy), button=button)
+
+        clicked.append((cx, cy))
+
+    # =========================
+    # Rapport
+    # =========================
+    if verbose:
+        print("📊 Rapport")
+        print(f"   Totaal hits     : {len(ordered)}")
+        print(f"   Geklikt         : {len(clicked)}")
+        print(f"   Overgeslagen    : {skipped}")
+        print(f"   Excluded        : {excluded}")
+        print(f"   Skip percentage : {skip_chance * 100:.1f}%")
+
+    return clicked
+
+def click_random_image(
+    image_name,
+    area_name,
+    bot_id=1,
+
+    # 🧪 Test & simulatie
+    dry_run=True,
+    seed=None,
+
+    # ⚙️ Gedrag
+    button="left",
+    padding=2,
+    verbose=True,
+    max_hits=60,
+    exclude_slots=None,
+    row_band_px=18,
+):
+    if seed is not None:
+        random.seed(seed)
+
+    img = _normalize_png(image_name)
+    hits = detect_images(img, area_name, bot_id=bot_id, verbose=verbose, max_hits=max_hits)
+
+    if not hits:
+        if verbose:
+            print("⚠️ Geen hits gevonden")
+        return None
+
+    band = max(6, int(row_band_px))
+    exclude = set(exclude_slots or [])
+
+    def row_id(h):
+        return int(h.y // band)
+
+    # Optioneel: exclude op index (zelfde idee als click_images)
+    rows = {}
+    for h in hits:
+        rows.setdefault(row_id(h), []).append(h)
+
+    ordered = []
+    for rk in sorted(rows.keys()):
+        row_hits = sorted(rows[rk], key=lambda h: int(h.x))
+        ordered.extend(row_hits)
+
+    available = [h for i, h in enumerate(ordered) if i not in exclude]
+
+    if not available:
+        if verbose:
+            print("⚠️ Alles is excluded")
+        return None
+
+    hit = random.choice(available)
+    cx, cy = _rand_point_in_hit(hit, padding)
+
+    if verbose:
+        mode = "Dry run 🧪" if dry_run else "Live 🔥"
+        print(f"🎯 Random hit | {img} | Mode={mode} | Pos=({cx},{cy}) | Vorm={hit.vorm:.2f} | Kleur={hit.kleur:.2f}")
+
+    if not dry_run:
+        move_and_click((cx, cy), button=button)
+
+    return (cx, cy)
+
+
 if __name__ == "__main__":
-    click_image("Close_Screen_X.png", "Bot_Area", bot_id=1, threshold=0.88)
+    
+    click_random_image(
+    "Item_Willow_Logs",
+    "Inventory_Area",
+    bot_id=1,
+    dry_run=False,
+    seed=None,
+    verbose=True)
+    
+    click_image("Close_Screen_X", "Bot_Area", bot_id=1, verbose=True)
+    click_images("Item_Willow_Logs", "Inventory_Area", bot_id=1, verbose=True)
+
+    click_images(
+        "Item_Willow_Logs.png",
+        "Inventory_Area",
+        bot_id=1,
+        verbose=True,
+        dry_run=False,
+        skip_chance=0.09,
+        seed=None)
+
+    # alles klikken in SNAKE patroon
+    # click_images("Smiley.png", "Inventory_Area_Pattern", bot_id=1, pattern="snake", max_clicks=28)
+
+    # row patroon (gewoon L->R elke rij)
+    # click_images("Smiley.png", "Inventory_Area_Pattern", bot_id=1, pattern="row", max_clicks=28)
+
+    # skip bv eerste slot
+    # click_images("Smiley.png", "Inventory_Area_Pattern", bot_id=1, pattern="snake", exclude_slots={0})
+

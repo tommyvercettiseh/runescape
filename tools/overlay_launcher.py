@@ -218,14 +218,18 @@ def run_overlay(bot_id, bot_min, bot_max, rest_min, rest_max, verbose, no_offset
                 self.next_switch = float("inf")
                 return
 
+            # Huidige kleur bepaalt hoe lang we NU blijven
             if self.mode == "green":
+                # groen = actief -> duur = bot_min..bot_max
                 self.next_mode = "red"
-                secs = random.randint(rest_min * 60, rest_max * 60)
-            else:
-                self.next_mode = "green"
                 secs = random.randint(bot_min * 60, bot_max * 60)
+            else:
+                # rood = rust -> duur = rest_min..rest_max
+                self.next_mode = "green"
+                secs = random.randint(rest_min * 60, rest_max * 60)
 
             self.next_switch = time.time() + secs
+
 
         def _loop(self):
             now = time.time()

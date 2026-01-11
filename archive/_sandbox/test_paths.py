@@ -1,0 +1,5 @@
+﻿from core.paths import PROJECT_ROOT, CONFIG_DIR, IMAGES_DIR, LOGS_DIR
+print("ROOT:", PROJECT_ROOT)
+print("CONFIG:", CONFIG_DIR)
+print("IMAGES:", IMAGES_DIR)
+print("LOGS:", LOGS_DIR)

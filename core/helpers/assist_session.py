@@ -43,6 +43,7 @@ def ensure_session(bot_id=1, verbose=True, want_logged_in=True, timeout=25):
     if verbose:
         print("⚠️ ensure_session timeout")
     return False
+
 # ============================================================
 # TEST
 # ============================================================

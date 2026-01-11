@@ -250,6 +250,104 @@ def detect_image_timeout(image_name, area_name, bot_id=1, timeout_sec=3, sleep_s
         _log_not_found(image_name, area_name)
     return None
 
+def detect_images(image_name, area_name, bot_id=1, areas=None, verbose=True, max_hits=60, nms_radius=0):
+    """
+    Vind ALLE hits (met dezelfde template settings als detect_image).
+    Geeft list[Hit] terug met absolute coords.
+    """
+    cfg = _load_template_settings(image_name)
+    method = cfg["method"]
+    min_shape = cfg["min_shape"]
+    min_color = cfg["min_color"]
+
+    areas = areas or load_areas()
+    if area_name not in areas:
+        raise KeyError(f"Area niet gevonden: {area_name}")
+
+    tpl_rgb, tpl_gray = _read_template(image_name)
+    th, tw = tpl_gray.shape[:2]
+
+    x1, y1, x2, y2 = map(int, apply_offset(areas[area_name], bot_id))
+    w, h = x2 - x1, y2 - y1
+
+    shot = _grab_area_rgb(x1, y1, w, h)
+    gray = cv2.cvtColor(shot, cv2.COLOR_RGB2GRAY)
+
+    method_names = list(METHODS.keys()) if method == "ALL" else [method]
+    minimum_score_0_1 = float(min_shape) / 100.0
+
+    hits = []
+
+    for mname in method_names:
+        mval = METHODS[mname]
+        res = cv2.matchTemplate(gray, tpl_gray, mval)
+        scoremap = _scoremap_0_1(res, mname)
+
+        ys, xs = np.where(scoremap >= minimum_score_0_1)
+        if len(xs) == 0:
+            continue
+
+        scores = scoremap[ys, xs]
+        order = np.argsort(scores)[::-1]
+
+        rad = int(nms_radius) if int(nms_radius) > 0 else max(6, int(min(tw, th) * 0.55))
+
+        picked = []
+        for idx in order:
+            rx = int(xs[idx])
+            ry = int(ys[idx])
+            score_0_1 = float(scores[idx])
+            vorm = float(score_0_1 * 100.0)
+
+            too_close = False
+            for px, py, _ in picked:
+                dx = rx - px
+                dy = ry - py
+                if (dx * dx + dy * dy) <= (rad * rad):
+                    too_close = True
+                    break
+            if too_close:
+                continue
+
+            patch = shot[ry:ry + th, rx:rx + tw]
+            if patch.shape[:2] != (th, tw):
+                continue
+
+            kleur = _color_score(tpl_rgb, patch)
+            if kleur < float(min_color):
+                continue
+
+            picked.append((rx, ry, vorm))
+
+            hits.append(
+                Hit(
+                    x=x1 + rx,
+                    y=y1 + ry,
+                    width=tw,
+                    height=th,
+                    vorm=round(vorm, 2),
+                    kleur=round(kleur, 2),
+                )
+            )
+
+            if len(hits) >= int(max_hits):
+                break
+
+        if len(hits) >= int(max_hits):
+            break
+
+    if verbose:
+        if hits:
+            _log_found(image_name, area_name)
+            print(f"✅ hits: {len(hits)}")
+        else:
+            _log_not_found(image_name, area_name)
+
+    return hits
+
+
+
+
 # ============================================================
 # CLI TEST
 # ============================================================

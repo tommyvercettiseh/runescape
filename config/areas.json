@@ -82,10 +82,10 @@
   },
   "Inventory_Area_Pattern": {
     "coords": [
-      658,
-      253,
-      787,
-      474
+      638,
+      238,
+      812,
+      491
     ],
     "group": "default"
   },
@@ -95,15 +95,6 @@
       144,
       637,
       165
-    ],
-    "group": "default"
-  },
-  "NieuwGebied_2": {
-    "coords": [
-      100,
-      100,
-      200,
-      200
     ],
     "group": "default"
   },
@@ -122,6 +113,78 @@
       36,
       655,
       60
+    ],
+    "group": "default"
+  },
+  "NieuwGebied_1": {
+    "coords": [
+      100,
+      100,
+      200,
+      200
+    ],
+    "group": "default"
+  },
+  "Last_Inventory_Spot": {
+    "coords": [
+      770,
+      459,
+      803,
+      485
+    ],
+    "group": "default"
+  },
+  "NieuwGebied_3": {
+    "coords": [
+      100,
+      100,
+      200,
+      200
+    ],
+    "group": "default"
+  },
+  "Woodcutting": {
+    "coords": [
+      757,
+      383,
+      817,
+      413
+    ],
+    "group": "Skilling"
+  },
+  "NieuwGebied_2": {
+    "coords": [
+      756,
+      294,
+      817,
+      324
+    ],
+    "group": "SKilling"
+  },
+  "Fishing": {
+    "coords": [
+      757,
+      293,
+      820,
+      326
+    ],
+    "group": "Skilling"
+  },
+  "NieuwGebied_4": {
+    "coords": [
+      100,
+      100,
+      200,
+      200
+    ],
+    "group": "Skilling"
+  },
+  "Chat_Buttons": {
+    "coords": [
+      80,
+      498,
+      607,
+      535
     ],
     "group": "default"
   }

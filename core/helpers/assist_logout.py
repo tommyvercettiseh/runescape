@@ -19,8 +19,8 @@ if str(ROOT) not in sys.path:
 from core.click_image import click_image
 from vision.image_detection import detect_image
 from helpers.random_sleep import random_sleep
-
-
+from core.move_to_area import move_to_area
+from core.ai_cursor import click    
 # ============================================================
 # LOGOUT ASSIST
 # WAT: Probeert uit te loggen en wacht tot login screen zichtbaar is.
@@ -40,6 +40,9 @@ def assist_logout(*, bot_id=1, timeout=15, verbose=False):
     if verbose:
         print(f"🚪 Logging out (bot {bot_id})")
 
+    move_to_area("Chat_Area", bot_id=bot_id)
+    click()
+
     while time() - start < timeout:
         if detect_image(LOGIN_SCREEN, LOGIN_AREA, bot_id=bot_id, verbose=False):
             if verbose:
@@ -47,6 +50,9 @@ def assist_logout(*, bot_id=1, timeout=15, verbose=False):
             return True
 
         click_image("Logout_Door.png", "Buttons_Bottom", bot_id, verbose=False)
+        random_sleep()
+
+        click_image("Logout_Door_2.png", "Inventory_Area", bot_id, verbose=False)
         random_sleep()
 
         click_image("Logout_ClickHereToLogout.png", "Inventory_Area", bot_id, verbose=False)

@@ -29,6 +29,10 @@ HANDLE_OFFSET = 6
 HANDLE_FILL = "#ffffff"
 HANDLE_OUTLINE = "#333333"
 
+GRID_LINE_COLOR = "#00ff66"
+GRID_ROI_COLOR = "#ffcc00"
+GRID_TEXT_COLOR = "#ffffff"
+
 
 class AreaOverlay(tk.Tk):
     def __init__(self):
@@ -60,6 +64,10 @@ class AreaOverlay(tk.Tk):
         self.label_ids = {}
         self.handle_ids = {}
 
+        # Grid overlay ids
+        self.grid_ids = []
+        self.grid_text_ids = []
+
         # Bot offsets
         self.bot_id = 1
         self.x_offset, self.y_offset = get_offset(self.bot_id)
@@ -70,13 +78,20 @@ class AreaOverlay(tk.Tk):
         self.visible_areas = set(self.data.keys())
 
         # History (coords only)
-        self.undo_stack: dict[str, list[list[int]]] = {}  # per area: [coords_before, ...]
-        self.redo_stack: dict[str, list[list[int]]] = {}  # per area: [coords_after_undo, ...]
+        self.undo_stack = {}
+        self.redo_stack = {}
         self._edit_started = False
-        self._edit_area_name: str | None = None
+        self._edit_area_name = None
 
         # Deleted areas (undo delete)
-        self.deleted_stack: list[tuple[str, dict]] = []
+        self.deleted_stack = []
+
+        # Grid tool state
+        self.grid_parent_name = ""
+        self.grid_cols = 4
+        self.grid_rows = 7
+        self.grid_roi_pct = 40  # size of ROI inside cell (percentage)
+        self.grid_show = True
 
         # UI
         self.create_bot_selector()
@@ -93,14 +108,13 @@ class AreaOverlay(tk.Tk):
     # ----------------------------
     # IO
     # ----------------------------
-    def load_areas(self) -> dict:
+    def load_areas(self):
         try:
             raw = json.loads(AREAS_FILE.read_text(encoding="utf-8-sig"))
         except json.JSONDecodeError as e:
             print(f"⚠️ areas.json kapot: {e}")
             return {}
 
-        # Backwards compat: {"name":[x1,y1,x2,y2]} -> {"name":{"coords":[..],"group":"default"}}
         fixed = {}
         for name, v in (raw or {}).items():
             if isinstance(v, list) and len(v) == 4:
@@ -109,19 +123,18 @@ class AreaOverlay(tk.Tk):
                 fixed[name] = {"coords": v["coords"], "group": (v.get("group") or "default")}
         return fixed
 
-    def save_areas(self) -> None:
+    def save_areas(self):
         AREAS_FILE.write_text(json.dumps(self.data, indent=2), encoding="utf-8")
         print("✅ opgeslagen: areas.json")
 
     # ----------------------------
-    # History helpers (coords only)
+    # History helpers
     # ----------------------------
-    def _history_init(self, name: str) -> None:
+    def _history_init(self, name):
         self.undo_stack.setdefault(name, [])
         self.redo_stack.setdefault(name, [])
 
-    def _record_before_edit(self, name: str) -> None:
-        # record 1x per drag/edit session
+    def _record_before_edit(self, name):
         if self._edit_started and self._edit_area_name == name:
             return
 
@@ -133,7 +146,7 @@ class AreaOverlay(tk.Tk):
         self._edit_started = True
         self._edit_area_name = name
 
-    def undo_area(self, name: str) -> None:
+    def undo_area(self, name):
         self._history_init(name)
         if not self.undo_stack[name]:
             return
@@ -148,7 +161,7 @@ class AreaOverlay(tk.Tk):
         self.draw_areas()
         self.create_selection_window()
 
-    def redo_area(self, name: str) -> None:
+    def redo_area(self, name):
         self._history_init(name)
         if not self.redo_stack[name]:
             return
@@ -166,7 +179,7 @@ class AreaOverlay(tk.Tk):
     # ----------------------------
     # Delete helpers
     # ----------------------------
-    def delete_area(self, name: str) -> None:
+    def delete_area(self, name):
         if name not in self.data:
             return
 
@@ -184,12 +197,11 @@ class AreaOverlay(tk.Tk):
         self.draw_areas()
         self.create_selection_window()
 
-    def undo_delete(self) -> None:
+    def undo_delete(self):
         if not self.deleted_stack:
             return
         name, payload = self.deleted_stack.pop()
         if name in self.data:
-            # als naam alweer bestaat, pak suffix
             base = name
             i = 2
             while f"{base}_{i}" in self.data:
@@ -207,7 +219,7 @@ class AreaOverlay(tk.Tk):
     # ----------------------------
     # Helpers
     # ----------------------------
-    def get_groups(self) -> list[str]:
+    def get_groups(self):
         groups = sorted({(v.get("group") or "default") for v in self.data.values()})
         return ["all"] + groups
 
@@ -215,10 +227,10 @@ class AreaOverlay(tk.Tk):
         x1, y1, x2, y2 = coords
         return [x1 + self.x_offset, y1 + self.y_offset, x2 + self.x_offset, y2 + self.y_offset]
 
-    def get_bright_color(self) -> str:
+    def get_bright_color(self):
         return f"#{random.randint(120, 255):02x}{random.randint(120, 255):02x}{random.randint(120, 255):02x}"
 
-    def filtered_names(self) -> list[str]:
+    def filtered_names(self):
         names = []
         for name, obj in self.data.items():
             g = (obj.get("group") or "default")
@@ -230,14 +242,14 @@ class AreaOverlay(tk.Tk):
     # ----------------------------
     # Bot selector
     # ----------------------------
-    def create_bot_selector(self) -> None:
+    def create_bot_selector(self):
         frame = tk.Frame(self, bg="black")
         frame.place(x=20, y=20)
 
         tk.Label(frame, text="Bot ID:", bg="black", fg="white").pack(side="left")
 
         bot_var = tk.IntVar(value=self.bot_id)
-        for i in range(1, 5):
+        for i in (1, 2, 3, 4):
             tk.Radiobutton(
                 frame,
                 text=str(i),
@@ -249,7 +261,7 @@ class AreaOverlay(tk.Tk):
                 selectcolor="gray",
             ).pack(side="left")
 
-    def switch_bot(self, new_id: int) -> None:
+    def switch_bot(self, new_id):
         self.bot_id = int(new_id)
         self.x_offset, self.y_offset = get_offset(self.bot_id)
         print(f"🔄 Bot {self.bot_id} offset=({self.x_offset},{self.y_offset})")
@@ -259,7 +271,7 @@ class AreaOverlay(tk.Tk):
     # ----------------------------
     # Drawing
     # ----------------------------
-    def draw_areas(self) -> None:
+    def draw_areas(self):
         self.canvas.delete("all")
         self.rect_ids.clear()
         self.label_ids.clear()
@@ -292,7 +304,9 @@ class AreaOverlay(tk.Tk):
 
             self.draw_handles(name, ox1, oy1, ox2, oy2)
 
-    def draw_handles(self, name, ox1, oy1, ox2, oy2) -> None:
+        self._draw_grid_overlay()
+
+    def draw_handles(self, name, ox1, oy1, ox2, oy2):
         positions = self.handle_positions(ox1, oy1, ox2, oy2)
         self.handle_ids[name] = {}
         for pos, (cx, cy) in positions.items():
@@ -318,6 +332,183 @@ class AreaOverlay(tk.Tk):
             "sw": (x1 - HANDLE_OFFSET, y2 + HANDLE_OFFSET),
             "w": (x1 - HANDLE_OFFSET, (y1 + y2) / 2),
         }
+
+    # ----------------------------
+    # Grid overlay
+    # ----------------------------
+    def _clear_grid_overlay(self):
+        for it in self.grid_ids:
+            try:
+                self.canvas.delete(it)
+            except Exception:
+                pass
+        for it in self.grid_text_ids:
+            try:
+                self.canvas.delete(it)
+            except Exception:
+                pass
+        self.grid_ids = []
+        self.grid_text_ids = []
+
+    def _calc_grid_rois_base(self, base_xyxy, cols, rows, roi_pct):
+        x1, y1, x2, y2 = base_xyxy
+        w = max(1, x2 - x1)
+        h = max(1, y2 - y1)
+
+        cw = w / max(1, cols)
+        ch = h / max(1, rows)
+
+        roi_scale = max(5, min(100, int(roi_pct))) / 100.0
+
+        out = []
+        idx = 0
+        for r in range(rows):
+            for c in range(cols):
+                cx1 = x1 + c * cw
+                cy1 = y1 + r * ch
+                cx2 = cx1 + cw
+                cy2 = cy1 + ch
+
+                ccx = (cx1 + cx2) / 2
+                ccy = (cy1 + cy2) / 2
+                rw = cw * roi_scale
+                rh = ch * roi_scale
+
+                rx1 = int(ccx - rw / 2)
+                ry1 = int(ccy - rh / 2)
+                rx2 = int(ccx + rw / 2)
+                ry2 = int(ccy + rh / 2)
+
+                out.append((idx, int(cx1), int(cy1), int(cx2), int(cy2), rx1, ry1, rx2, ry2))
+                idx += 1
+
+        return out
+
+    def _draw_grid_overlay(self):
+        self._clear_grid_overlay()
+
+        if not self.grid_show:
+            return
+        if not self.grid_parent_name:
+            return
+        if self.grid_parent_name not in self.data:
+            return
+        if self.grid_parent_name not in self.visible_areas:
+            return
+
+        base = self.data[self.grid_parent_name]["coords"]
+        cols = int(self.grid_cols)
+        rows = int(self.grid_rows)
+        roi_pct = int(self.grid_roi_pct)
+
+        rois = self._calc_grid_rois_base(base, cols, rows, roi_pct)
+
+        for idx, cx1, cy1, cx2, cy2, rx1, ry1, rx2, ry2 in rois:
+            ox1, oy1, ox2, oy2 = self.offset_area([cx1, cy1, cx2, cy2])
+            orx1, ory1, orx2, ory2 = self.offset_area([rx1, ry1, rx2, ry2])
+
+            gid = self.canvas.create_rectangle(
+                ox1, oy1, ox2, oy2,
+                outline=GRID_LINE_COLOR,
+                width=1
+            )
+            self.grid_ids.append(gid)
+
+            rid = self.canvas.create_rectangle(
+                orx1, ory1, orx2, ory2,
+                outline=GRID_ROI_COLOR,
+                width=2
+            )
+            self.grid_ids.append(rid)
+
+            tx = (orx1 + orx2) // 2
+            ty = (ory1 + ory2) // 2
+            tid = self.canvas.create_text(
+                tx, ty,
+                text=str(idx),
+                fill=GRID_TEXT_COLOR,
+                font=("Arial", 10, "bold")
+            )
+            self.grid_text_ids.append(tid)
+
+    def _grid_refresh_from_ui(self):
+        if hasattr(self, "grid_parent_var"):
+            self.grid_parent_name = (self.grid_parent_var.get() or "").strip()
+        if hasattr(self, "grid_cols_var"):
+            self.grid_cols = int(self.grid_cols_var.get())
+        if hasattr(self, "grid_rows_var"):
+            self.grid_rows = int(self.grid_rows_var.get())
+        if hasattr(self, "grid_roi_var"):
+            self.grid_roi_pct = int(self.grid_roi_var.get())
+        if hasattr(self, "grid_show_var"):
+            self.grid_show = bool(self.grid_show_var.get())
+
+        self.draw_areas()
+
+    def save_grid_as_areas(self):
+        parent = (self.grid_parent_var.get() or "").strip()
+        if not parent or parent not in self.data:
+            return messagebox.showerror("Grid", "Kies een geldige parent area", parent=self.selection_window)
+
+        cols = int(self.grid_cols_var.get())
+        rows = int(self.grid_rows_var.get())
+        roi_pct = int(self.grid_roi_var.get())
+
+        base = self.data[parent]["coords"]
+        rois = self._calc_grid_rois_base(base, cols, rows, roi_pct)
+
+        prefix = f"{parent}__"
+        existing = [k for k in self.data.keys() if k.startswith(prefix)]
+        if existing:
+            if not messagebox.askyesno(
+                "Grid",
+                f"Er bestaan al {len(existing)} grid-areas met prefix:\n{prefix}\n\nOverschrijven?",
+                parent=self.selection_window,
+            ):
+                return
+            for k in existing:
+                self.data.pop(k, None)
+                self.visible_areas.discard(k)
+                self.undo_stack.pop(k, None)
+                self.redo_stack.pop(k, None)
+
+        g = self.data[parent].get("group") or "default"
+        grid_group = f"{g}_grid"
+
+        for idx, cx1, cy1, cx2, cy2, rx1, ry1, rx2, ry2 in rois:
+            r = idx // cols + 1
+            c = idx % cols + 1
+            name = f"{prefix}r{r:02d}c{c:02d}"
+            self.data[name] = {"coords": [rx1, ry1, rx2, ry2], "group": grid_group}
+            self.visible_areas.add(name)
+            self._history_init(name)
+
+        self.save_areas()
+        self.draw_areas()
+        self.create_selection_window()
+        messagebox.showinfo("✅ Grid saved", f"{rows*cols} areas gemaakt\nGroup: {grid_group}", parent=self.selection_window)
+
+    def delete_saved_grid(self):
+        parent = (self.grid_parent_var.get() or "").strip()
+        if not parent:
+            return
+        prefix = f"{parent}__"
+        keys = [k for k in self.data.keys() if k.startswith(prefix)]
+        if not keys:
+            return messagebox.showinfo("Grid", "Geen saved grid gevonden voor deze parent.", parent=self.selection_window)
+
+        if not messagebox.askyesno("Grid", f"{len(keys)} grid-areas verwijderen?\nPrefix: {prefix}", parent=self.selection_window):
+            return
+
+        for k in keys:
+            self.data.pop(k, None)
+            self.visible_areas.discard(k)
+            self.undo_stack.pop(k, None)
+            self.redo_stack.pop(k, None)
+
+        self.save_areas()
+        self.draw_areas()
+        self.create_selection_window()
 
     # ----------------------------
     # Hit helpers
@@ -447,7 +638,6 @@ class AreaOverlay(tk.Tk):
 
         self.data[new_name] = self.data.pop(old_name)
 
-        # move history too
         if old_name in self.undo_stack:
             self.undo_stack[new_name] = self.undo_stack.pop(old_name)
         if old_name in self.redo_stack:
@@ -457,11 +647,14 @@ class AreaOverlay(tk.Tk):
             self.visible_areas.remove(old_name)
             self.visible_areas.add(new_name)
 
+        if self.grid_parent_name == old_name:
+            self.grid_parent_name = new_name
+
         self.save_areas()
         self.draw_areas()
         self.create_selection_window()
 
-    def prompt_group(self, name: str):
+    def prompt_group(self, name):
         cur = (self.data[name].get("group") or "default")
         g = simpledialog.askstring("Group", f"Group voor '{name}':", initialvalue=cur, parent=self)
         if not g:
@@ -481,7 +674,7 @@ class AreaOverlay(tk.Tk):
 
         self.selection_window = tk.Toplevel(self)
         self.selection_window.title(f"Areas (Bot {self.bot_id})")
-        self.selection_window.geometry(f"+{self.winfo_screenwidth() - 520}+100")
+        self.selection_window.geometry(f"+{self.winfo_screenwidth() - 560}+80")
         self.selection_window.attributes("-topmost", True)
         self.selection_window.resizable(False, False)
 
@@ -498,6 +691,7 @@ class AreaOverlay(tk.Tk):
             self.visible_areas = set(self.filtered_names())
             self.draw_areas()
             rebuild_list()
+            self._grid_refresh_from_ui()
 
         self.group_var.trace_add("write", on_group_change)
 
@@ -517,7 +711,55 @@ class AreaOverlay(tk.Tk):
             state=("normal" if self.deleted_stack else "disabled"),
         ).pack(side="left", fill="x", expand=True)
 
+        # ----------------------------
+        # Grid Tool
+        # ----------------------------
+        gridbox = tk.LabelFrame(self.selection_window, text="Grid Tool (parent → cells → centre ROI)")
+        gridbox.pack(fill="x", padx=10, pady=(0, 8))
+
+        names_for_grid = [n for n in self.filtered_names() if n in self.visible_areas]
+        if not self.grid_parent_name and names_for_grid:
+            self.grid_parent_name = names_for_grid[0]
+
+        self.grid_parent_var = tk.StringVar(value=self.grid_parent_name)
+        self.grid_cols_var = tk.IntVar(value=int(self.grid_cols))
+        self.grid_rows_var = tk.IntVar(value=int(self.grid_rows))
+        self.grid_roi_var = tk.IntVar(value=int(self.grid_roi_pct))
+        self.grid_show_var = tk.BooleanVar(value=bool(self.grid_show))
+
+        row1 = tk.Frame(gridbox)
+        row1.pack(fill="x", padx=8, pady=6)
+        tk.Label(row1, text="Parent area").pack(side="left")
+        parent_menu = tk.OptionMenu(row1, self.grid_parent_var, *names_for_grid)
+        parent_menu.pack(side="left", fill="x", expand=True, padx=8)
+        tk.Checkbutton(row1, text="Show grid", variable=self.grid_show_var, command=self._grid_refresh_from_ui).pack(side="right")
+
+        row2 = tk.Frame(gridbox)
+        row2.pack(fill="x", padx=8, pady=(0, 6))
+
+        tk.Label(row2, text="Cols").pack(side="left")
+        tk.Scale(row2, from_=1, to=12, orient="horizontal", variable=self.grid_cols_var, command=lambda *_: self._grid_refresh_from_ui(), length=160).pack(side="left", padx=6)
+
+        tk.Label(row2, text="Rows").pack(side="left")
+        tk.Scale(row2, from_=1, to=12, orient="horizontal", variable=self.grid_rows_var, command=lambda *_: self._grid_refresh_from_ui(), length=160).pack(side="left", padx=6)
+
+        row3 = tk.Frame(gridbox)
+        row3.pack(fill="x", padx=8, pady=(0, 6))
+        tk.Label(row3, text="ROI size % (centre)").pack(side="left")
+        tk.Scale(row3, from_=5, to=100, orient="horizontal", variable=self.grid_roi_var, command=lambda *_: self._grid_refresh_from_ui(), length=340).pack(side="left", padx=6)
+        tk.Label(row3, text="(kleiner = strakker)").pack(side="left")
+
+        row4 = tk.Frame(gridbox)
+        row4.pack(fill="x", padx=8, pady=(0, 8))
+        tk.Button(row4, text="💾 Save grid as areas", command=self.save_grid_as_areas).pack(side="left", fill="x", expand=True, padx=(0, 6))
+        tk.Button(row4, text="🧹 Delete saved grid", command=self.delete_saved_grid).pack(side="left", fill="x", expand=True)
+
+        # hook variable changes
+        self.grid_parent_var.trace_add("write", lambda *_: self._grid_refresh_from_ui())
+
+        # ----------------------------
         # Search
+        # ----------------------------
         search_var = tk.StringVar()
 
         def rebuild_list():
@@ -529,6 +771,15 @@ class AreaOverlay(tk.Tk):
                 if text and text not in name.lower():
                     continue
                 build_row(name)
+
+            # refresh option menu for grid parent with current filtered visible list
+            current_names = [n for n in self.filtered_names() if n in self.visible_areas]
+            menu = parent_menu["menu"]
+            menu.delete(0, "end")
+            for n in current_names:
+                menu.add_command(label=n, command=lambda v=n: self.grid_parent_var.set(v))
+            if current_names and self.grid_parent_var.get() not in current_names:
+                self.grid_parent_var.set(current_names[0])
 
         search_var.trace("w", lambda *_: rebuild_list())
 
@@ -590,6 +841,7 @@ class AreaOverlay(tk.Tk):
             tk.Button(row, text="✎", width=2, command=lambda n=name: self.prompt_rename(n)).pack(side="right", padx=2)
 
         rebuild_list()
+        self._grid_refresh_from_ui()
 
     def select_all(self):
         for var in self.check_vars.values():
@@ -604,6 +856,7 @@ class AreaOverlay(tk.Tk):
     def update_visible_areas(self):
         self.visible_areas = {name for name, var in self.check_vars.items() if var.get()}
         self.draw_areas()
+        self._grid_refresh_from_ui()
 
     def add_new_area(self):
         base = "NieuwGebied"

@@ -1,11 +1,12 @@
 ﻿from __future__ import annotations
 
+import os
 import json
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-# 🆔 Offset matrix per bot (exact zoals je vorige bot)
+# 🆔 Offset matrix per bot (fallback / backwards compat)
 BOT_OFFSETS: Dict[int, Tuple[int, int]] = {
     1: (0, 0),
     2: (958, 0),
@@ -22,12 +23,13 @@ AreasDict = Dict[str, Coords] # {"Info Area": [..], ...}
 ROOT = Path(__file__).resolve().parents[1]
 AREAS_FILE = (ROOT / "config" / "areas.json").resolve()
 
-# backwards compat: pack naam bestaat nog, maar we negeren 'm
 CONFIG_PACK = "config/areas.json"
 DEFAULT_PACK = CONFIG_PACK
 # ============================================================
 # ===== END AREAS SOURCE =====================================
 # ============================================================
+
+_OFFSETS_JSON_CACHE: Dict[int, Tuple[int, int]] | None = None
 
 
 def _to_int(v: Any) -> int:
@@ -55,18 +57,83 @@ def _normalize_coords(coords: Any) -> Coords:
     return [x1, y1, x2, y2]
 
 
-def get_bot_id(default: int = 1) -> int:
+def _load_offsets_json() -> Dict[int, Tuple[int, int]]:
+    global _OFFSETS_JSON_CACHE
+    if _OFFSETS_JSON_CACHE is not None:
+        return _OFFSETS_JSON_CACHE
+
+    path = (ROOT / "offsets.json").resolve()
+    if not path.exists():
+        _OFFSETS_JSON_CACHE = {}
+        return _OFFSETS_JSON_CACHE
+
     try:
-        return int(sys.argv[1])
-    except (IndexError, ValueError):
+        raw = path.read_text(encoding="utf-8-sig")  # ✅ BOM-proof
+        data = json.loads(raw) if raw.strip() else {}
+    except Exception:
+        _OFFSETS_JSON_CACHE = {}
+        return _OFFSETS_JSON_CACHE
+
+    out: Dict[int, Tuple[int, int]] = {}
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if isinstance(v, list) and len(v) == 2:
+                try:
+                    out[int(k)] = (int(v[0]), int(v[1]))
+                except Exception:
+                    try:
+                        out[int(k)] = (0, 0)
+                    except Exception:
+                        pass
+
+    _OFFSETS_JSON_CACHE = out
+    return _OFFSETS_JSON_CACHE
+
+
+def get_bot_id(default: int = 1) -> int:
+    # 1) runner faked argv: script.py <bot_id>
+    if len(sys.argv) > 1:
+        try:
+            return int(sys.argv[1])
+        except Exception:
+            pass
+
+    # 2) manager env fallback
+    try:
+        return int(os.getenv("BOT_ID", str(default)))
+    except Exception:
         return default
 
 
-def get_offset(bot_id: int) -> Tuple[int, int]:
+def get_offset(bot_id: int | None = None) -> Tuple[int, int]:
+    # ✅ Variant A: get_offset(2)
+    # ✅ Variant B: get_offset()
+
+    # 1) manager env override (als je manager dit meegeeft)
+    ex = os.getenv("BOT_OFFSET_X")
+    ey = os.getenv("BOT_OFFSET_Y")
+    if ex is not None and ey is not None:
+        try:
+            return int(ex), int(ey)
+        except Exception:
+            pass
+
+    # 2) bot_id bepalen
+    if bot_id is None:
+        bot_id = get_bot_id()
+
+    # 3) offsets.json voorrang
+    offsets_file = _load_offsets_json()
+    if offsets_file:
+        return offsets_file.get(int(bot_id), (0, 0))
+
+    # 4) fallback hardcoded
     return BOT_OFFSETS.get(int(bot_id), (0, 0))
 
 
-def apply_offset(coords: Any, bot_id: int) -> Coords:
+def apply_offset(coords: Any, bot_id: int | None = None) -> Coords:
+    # ✅ Variant A: apply_offset(coords, 2)
+    # ✅ Variant B: apply_offset(coords)
     ox, oy = get_offset(bot_id)
     x1, y1, x2, y2 = _normalize_coords(coords)
     return [x1 + ox, y1 + oy, x2 + ox, y2 + oy]
@@ -89,7 +156,6 @@ def _pick_default_pack() -> str:
 
 
 def _pack_to_path(_pack: str) -> Path:
-    # elke pack mappen we naar config/areas.json (compat)
     _ensure_areas_file_exists()
     return AREAS_FILE
 
@@ -104,17 +170,9 @@ def _load_json_file(path: Path) -> dict:
 
 
 def _flatten_areas(raw: Any, *, verbose: bool = False) -> AreasDict:
-    """
-    Ondersteunt (en skip rommel zoals 'profile': 'Basic'):
-      1) flat: {"name": [x1,y1,x2,y2], ...}
-      2) wrapper: {"areas": {...}, "profile": "Basic", ...}
-      3) categories: {"cat": {"name": [..]}, "cat2": {...}}
-      4) dict-area: {"name": {"coords":[..]} } of {"name":{"xyxy":[..]}}
-    """
     if not isinstance(raw, dict):
         return {}
 
-    # wrapper: {"areas": {...}}
     if "areas" in raw and isinstance(raw["areas"], dict):
         raw = raw["areas"]
 
@@ -132,7 +190,6 @@ def _flatten_areas(raw: Any, *, verbose: bool = False) -> AreasDict:
     out: AreasDict = {}
 
     for name, val in raw.items():
-        # category (maar val kan ook metadata zijn)
         if isinstance(val, dict) and not any(k in val for k in ("coords", "xyxy", "box", "rect")):
             for subname, subval in val.items():
                 coords = extract_coords(subval)
@@ -155,15 +212,6 @@ def _flatten_areas(raw: Any, *, verbose: bool = False) -> AreasDict:
 
 
 def load_areas(pack: str | None = None, *, all_packs: bool = False, verbose: bool = False) -> AreasDict:
-    """
-    API blijft hetzelfde, maar source is ALLEEN config/areas.json.
-
-    all_packs=False:
-        mapped naar config/areas.json
-
-    all_packs=True:
-        'merge packs' blijft bestaan, maar er is maar 1 pack
-    """
     _ensure_areas_file_exists()
 
     if all_packs:

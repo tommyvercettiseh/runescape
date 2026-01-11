@@ -8,9 +8,10 @@ if str(ROOT) not in sys.path:
 # ============================================================
 # IMPORTS
 # ============================================================
+from helpers.random_sleep import sleep_custom
 from core.click_image import click_image
 from vision.image_detection import detect_image
-
+from states.should_play_status import should_play
 
 # ============================================================
 # ASSIST CLICK EXCLUDE
@@ -35,7 +36,13 @@ def assist_click_exclude(
         print("🚫 Exclude gevonden → klikken")
 
     # 2) Eén klik, verder niks
-    click_image(target_img, area, bot_id, verbose=False)
+    if click_image(target_img, area, bot_id, verbose=True):
+        sleep_custom(1.1, 2.2)
+        if not should_play(bot_id, verbose=False):
+            if verbose:
+                print("🚫 Exclude geklikt, bot is nu uitgesloten")
+
+
     return True
 
 

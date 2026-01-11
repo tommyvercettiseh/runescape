@@ -1,0 +1,35 @@
+{
+  "infinite": true,
+  "one_round": false,
+  "active": {
+    "1": false,
+    "2": false,
+    "3": false,
+    "4": false
+  },
+  "scripts": {
+    "1": "",
+    "2": "",
+    "3": "",
+    "4": ""
+  },
+  "active_1": true,
+  "script_1": "woodcutting.py",
+  "item_pick_1": "Item_Willow_Logs.png",
+  "item_query_1": "willo",
+  "active_2": false,
+  "script_2": "woodcutting.py",
+  "item_pick_2": "Item_Willow_Logs.png",
+  "item_query_2": "willo",
+  "active_3": true,
+  "script_3": "woodcutting.py",
+  "item_pick_3": "Item_Willow_Logs.png",
+  "item_query_3": "will",
+  "active_4": false,
+  "script_4": "woodcutting.py",
+  "item_pick_4": "Antiban_Exclude.png",
+  "item_query_4": "",
+  "runtime_hours": 8,
+  "runtime_minutes": 0,
+  "loop_mode": 2
+}
