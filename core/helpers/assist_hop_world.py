@@ -30,6 +30,4 @@ def assist_hop_world(bot_id=1):
     move_in_area("Chat_Area", bot_id=bot_id, verbose=False, padding=3)
     click()
     random_sleep()
-    press_key("q")
-
-assist_hop_world(bot_id=1)   
+    press_key("q") 

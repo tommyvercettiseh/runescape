@@ -12,7 +12,9 @@ if str(ROOT) not in sys.path:
 # ============================================================
 # IMPORTS
 # ============================================================
+from core.helpers import assist_click_tab
 from vision.image_detection import detect_image
+from core.helpers.assist_click_tab import assist_click_tab
 
 # ============================================================
 # ASSIST INVENTORY
@@ -23,17 +25,21 @@ def assist_inventory_empty(
     area="Last_Inventory_Spot",
     empty_img="Empty_Last_Spot.png",
     verbose=True,
-) -> bool:
+):
+
+    if not assist_click_tab("Inventory", bot_id=bot_id, verbose=verbose):
+        if verbose:
+            print("Inventory tab openen mislukt 🔴")
+        return False
 
     if detect_image(empty_img, area, bot_id=bot_id, verbose=False):
         if verbose:
-            print("🎒 Inventory leeg 🟢")
+            print("Inventory leeg 🟢")
         return True
 
     if verbose:
-        print("🎒 Inventory is vol 🔴")
+        print("Inventory is vol 🔴")
     return False
-
 
 # ============================================================
 # TEST

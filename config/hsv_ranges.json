@@ -1,0 +1,19 @@
+{
+  "labels": {
+    "fire": {
+      "lower": [
+        20,
+        174,
+        51
+      ],
+      "upper": [
+        42,
+        255,
+        255
+      ],
+      "s_min": 60,
+      "v_min": 60,
+      "samples_dir": "C:/Users/Hesse/Desktop/Runescape/assets/samples/fire"
+    }
+  }
+}

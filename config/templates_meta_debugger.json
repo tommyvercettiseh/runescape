@@ -300,8 +300,8 @@
   },
   "Item_Willow_Logs.png": {
     "method": "TM_CCOEFF",
-    "min_shape": 90.0,
-    "min_color": 90.0,
+    "min_shape": 85.0,
+    "min_color": 85.0,
     "area": "Inventory_Area"
   },
   "Item_Logs_ToDrop.png": {
@@ -334,10 +334,118 @@
     "min_color": 90.0,
     "area": "Tab_Confirmation_Area"
   },
-  "Chat_Area_YourInventoryIsTooFull.png": {
+  "Screenshot_20260112_214643.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Tab_Confirmation_Area"
+  },
+  "Tab_Settings_AllSettings.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 95.0,
+    "area": "Tab_Confirmation_Area"
+  },
+  "Tab_Settings_Display.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Tab_Confirmation_Area"
+  },
+  "fire_reference.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 75.0,
+    "area": "Bot_Area_Center"
+  },
+  "Chat_Area_YourInventoryIsTooFulls.png": {
     "method": "TM_CCOEFF",
     "min_shape": 90.0,
     "min_color": 90.0,
     "area": "Chat_Area"
+  },
+  "Chat_Area_YourInventoryIsTooFull.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Chat_Area"
+  },
+  "Tiles_Fire.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Bot_Area"
+  },
+  "Tile_Fire.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 90.0,
+    "area": "Bot_Area"
+  },
+  "Item_Tinderbox.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 95.0,
+    "area": "Inventory_Area"
+  },
+  "USe.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 97.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Firemaking_Continue.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 10.0,
+    "area": "Chat_Area"
+  },
+  "Action_Attack.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Bot_Area"
+  },
+  "Action_Drop.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Item_All_Logs.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 75.0,
+    "min_color": 70.0,
+    "area": "Tab_Confirmation_Area"
+  },
+  "Item_Axe.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 99.0,
+    "min_color": 10.0,
+    "area": "Inventory_Area"
+  },
+  "Item_SmallFishingNet.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Icon_Bank.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Icon_Quest.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 70.0,
+    "area": "Info_Area"
+  },
+  "Icon_Fishing.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 90.0,
+    "area": "Info_Area"
   }
 }

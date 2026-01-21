@@ -10,13 +10,10 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
+from telemetry import update_state
+import time
 
-import os, sys
-print("PYTHON:", sys.executable)
-print("CWD:", os.getcwd())
-print("ARGV:", sys.argv)
-print("PATH0:", sys.path[0])
-print("-" * 40)
+
 
 # =========================
 # PATHS
@@ -30,6 +27,10 @@ IMAGES_DIR = PROJECT_ROOT / "assets" / "images"
 CONFIG_FILE = PROJECT_ROOT / "botmanager_config.json"
 BOT_IDS = [1, 2, 3, 4]
 
+try:
+    from telemetry import update_state
+except Exception:
+    update_state = None
 
 # =========================
 # HELPERS
@@ -141,7 +142,11 @@ class BotManagerGUI(tk.Tk):
         # ✅ Loop mode: 1 = 1 ronde, 2 = oneindig
         self.loop_mode_var = tk.IntVar()
 
+        # ✅ HOTKEY STATE
+        self.is_paused = False
+
         self._build_ui()
+        self._bind_hotkeys()
 
     # =========================
     # UI safe call
@@ -161,6 +166,37 @@ class BotManagerGUI(tk.Tk):
         self._ui(_do)
 
     # =========================
+    # HOTKEYS
+    # F8  pause/resume
+    # F9  play/start
+    # ESC stop + close
+    # =========================
+    def _bind_hotkeys(self):
+        self.bind_all("<F8>", lambda _e: self.toggle_pause())
+        self.bind_all("<F9>", lambda _e: self.play_carousel())
+        self.bind_all("<Escape>", lambda _e: self.stop_and_exit())
+        self.protocol("WM_DELETE_WINDOW", self.stop_and_exit)
+
+    def toggle_pause(self):
+        self.is_paused = not self.is_paused
+        if self.is_paused:
+            self.log("⏸️ PAUSED (F8 om verder te gaan)")
+        else:
+            self.log("▶️ RESUMED")
+        self._set_loop_ui(self.carousel_running)
+
+    def stop_and_exit(self):
+        self.log("🧨 ESC: stop alles + sluiten")
+        try:
+            self.stop_all()
+        finally:
+            try:
+                self.stop_overlay()
+            except Exception:
+                pass
+            self.after(50, self.destroy)
+
+    # =========================
     # BUILD UI
     # =========================
     def _build_ui(self):
@@ -177,17 +213,17 @@ class BotManagerGUI(tk.Tk):
             pady=8,
         ).pack(side="left")
 
-        # ✅ Play knop bovenin
+        # ✅ Play knop bovenin (F9)
         self.btn_play_top = tk.Button(
             top,
-            text="▶️ Play",
+            text="▶️ Play (F9)",
             font=("Segoe UI", 10, "bold"),
             command=self.play_carousel,
             bg="#16b870",
             fg="#fff",
             activebackground="#29db92",
             relief="groove",
-            width=10,
+            width=14,
         )
         self.btn_play_top.pack(side="right", padx=10)
 
@@ -434,16 +470,16 @@ class BotManagerGUI(tk.Tk):
         btns.pack(pady=8)
 
         self.btn_start_loop = tk.Button(
-            btns, text="▶️ Start loop (Active bots)", font=self.font_button,
+            btns, text="▶️ Start loop (F9)", font=self.font_button,
             command=self.play_carousel, bg="#16b870", fg="#fff",
             width=26, activebackground="#29db92", relief="groove",
         )
         self.btn_start_loop.pack(side="left", padx=8)
 
         self.btn_stop_all = tk.Button(
-            btns, text="⛔ Stop", font=self.font_button,
+            btns, text="⛔ Stop (ESC)", font=self.font_button,
             command=self.stop_all, bg="#e34d60", fg="#fff",
-            width=10, activebackground="#ff6b7c", relief="groove",
+            width=14, activebackground="#ff6b7c", relief="groove",
         )
         self.btn_stop_all.pack(side="left", padx=8)
 
@@ -608,17 +644,25 @@ class BotManagerGUI(tk.Tk):
             if not self.btn_start_loop or not self.btn_stop_all:
                 return
 
+            # top play knop
             if self.btn_play_top:
                 if running:
-                    self.btn_play_top.config(text="🎠 Playing…", state="disabled", bg="#2a2a2b", activebackground="#2a2a2b")
+                    if self.is_paused:
+                        self.btn_play_top.config(text="⏸️ Paused (F8)", state="normal", bg="#2a2a2b", activebackground="#2a2a2b")
+                    else:
+                        self.btn_play_top.config(text="🎠 Playing…", state="disabled", bg="#2a2a2b", activebackground="#2a2a2b")
                 else:
-                    self.btn_play_top.config(text="▶️ Play", state="normal", bg="#16b870", activebackground="#29db92")
+                    self.btn_play_top.config(text="▶️ Play (F9)", state="normal", bg="#16b870", activebackground="#29db92")
 
+            # bottom start knop
             if running:
-                self.btn_start_loop.config(text="🎠 Loop draait…", state="disabled", bg="#2a2a2b", activebackground="#2a2a2b")
+                if self.is_paused:
+                    self.btn_start_loop.config(text="⏸️ Paused (F8)", state="normal", bg="#2a2a2b", activebackground="#2a2a2b")
+                else:
+                    self.btn_start_loop.config(text="🎠 Loop draait…", state="disabled", bg="#2a2a2b", activebackground="#2a2a2b")
                 self.btn_stop_all.config(state="normal")
             else:
-                self.btn_start_loop.config(text="▶️ Start loop (Active bots)", state="normal", bg="#16b870", activebackground="#29db92")
+                self.btn_start_loop.config(text="▶️ Start loop (F9)", state="normal", bg="#16b870", activebackground="#29db92")
                 self.btn_stop_all.config(state="normal")
         self._ui(_do)
 
@@ -751,13 +795,29 @@ class BotManagerGUI(tk.Tk):
         except Exception as e:
             self.log(f"❌ Stop fout Bot {bot_id}: {e}")
         finally:
+            if update_state:
+                rc = proc.returncode if proc else None
+                update_state(
+                    bot_id,
+                    active=False,
+                    ui_status="stopped",
+                    last_rc=rc,
+                    ended_at=time.time(),
+                )
+
             self.processes.pop(bot_id, None)
 
     # =========================
     # LOOP (CAROUSEL)
     # =========================
     def play_carousel(self):
+        # F9: als paused -> resume
         if self.carousel_thread and self.carousel_thread.is_alive():
+            if self.is_paused:
+                self.is_paused = False
+                self.log("▶️ RESUMED (F9)")
+                self._set_loop_ui(True)
+                return
             self.log("⏳ Loop draait al")
             return
 
@@ -765,6 +825,7 @@ class BotManagerGUI(tk.Tk):
             self.log("🟠 Geen Active bots geselecteerd")
             return
 
+        self.is_paused = False
         self.carousel_stop.clear()
         self.save_config()
 
@@ -785,6 +846,10 @@ class BotManagerGUI(tk.Tk):
                 ronde = 0
 
                 while not self.carousel_stop.is_set():
+                    # pause gate
+                    while self.is_paused and not self.carousel_stop.is_set():
+                        time.sleep(0.15)
+
                     ronde += 1
 
                     if not any(self.bot_active_var[b].get() for b in BOT_IDS):
@@ -802,6 +867,9 @@ class BotManagerGUI(tk.Tk):
                     for bot_id in BOT_IDS:
                         if self.carousel_stop.is_set():
                             return
+
+                        while self.is_paused and not self.carousel_stop.is_set():
+                            time.sleep(0.15)
 
                         if end_time is not None and time.time() >= end_time:
                             self.log("⏰ Max runtime bereikt tijdens ronde, stoppen")
@@ -821,17 +889,29 @@ class BotManagerGUI(tk.Tk):
                         self.log(f"▶️ Bot {bot_id} -> {sp.name}")
 
                         proc = self._start_proc(bot_id, sp)
-                        if not proc:
-                            self.set_status(bot_id, "fail")
-                            continue
+                        if update_state:
+                            update_state(
+                                bot_id,
+                                active=True,
+                                ui_status="running",
+                                script=sp.name,
+                                script_path=str(sp),
+                                started_at=time.time(),
+                            )
 
                         self.processes[bot_id] = proc
+
+                    
+
                         threading.Thread(target=self._stream_output, args=(bot_id, proc), daemon=True).start()
 
                         while proc.poll() is None:
                             if self.carousel_stop.is_set():
                                 self.stop_bot(bot_id)
                                 return
+
+                            while self.is_paused and not self.carousel_stop.is_set():
+                                time.sleep(0.15)
 
                             if end_time is not None and time.time() >= end_time:
                                 self.stop_bot(bot_id)
@@ -841,7 +921,15 @@ class BotManagerGUI(tk.Tk):
                             time.sleep(0.2)
 
                         rc = proc.returncode or 0
-                        self.processes.pop(bot_id, None)
+                        if update_state:
+                            update_state(
+                                bot_id,
+                                active=False,
+                                ui_status=("done" if rc == 0 else "fail"),
+                                last_rc=rc,
+                                ended_at=time.time(),
+                            )
+
 
                         if rc == 0:
                             self.set_status(bot_id, "done")
@@ -869,6 +957,7 @@ class BotManagerGUI(tk.Tk):
 
     def stop_all(self):
         self.carousel_stop.set()
+        self.is_paused = False
         for bot_id in BOT_IDS:
             self.stop_bot(bot_id)
         self.carousel_running = False

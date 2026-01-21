@@ -1,27 +1,21 @@
 from __future__ import annotations
 
-# ============================================================
-# BOOTSTRAP
-# ============================================================
 import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-# ============================================================
-# IMPORTS
-# ============================================================
 import time
 import json
+from pathlib import Path
 
 import cv2
 import numpy as np
 import pyautogui
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from core.paths import IMAGES_DIR, CONFIG_DIR
 from core.bot_offsets import load_areas, apply_offset
+from helpers.log import log
 
 # ============================================================
 # ANSI
@@ -50,7 +44,7 @@ META_FILE = Path(CONFIG_DIR) / "templates_meta.json"
 _TEMPLATE_CACHE = {}
 
 # ============================================================
-# HIT (zodat click_image hit.x werkt)
+# HIT
 # ============================================================
 class Hit:
     def __init__(self, x, y, width, height, vorm, kleur):
@@ -64,7 +58,7 @@ class Hit:
 # ============================================================
 # SETTINGS
 # ============================================================
-def _safe_read_json(path):
+def _safe_read_json(path: Path):
     if not path.exists():
         return {}
     try:
@@ -72,7 +66,7 @@ def _safe_read_json(path):
     except Exception:
         return {}
 
-def _load_template_settings(image_name):
+def _load_template_settings(image_name: str):
     meta = _safe_read_json(META_FILE)
     d = meta.get(image_name, {})
     return {
@@ -121,11 +115,52 @@ def _color_score(template_rgb, patch_rgb):
     return float(np.clip(100 - np.mean(diff), 0, 100))
 
 # ============================================================
-# GRAB + MATCH
+# GRAB
 # ============================================================
 def _grab_area_rgb(x1, y1, w, h):
     return np.array(pyautogui.screenshot(region=(x1, y1, w, h)))
 
+def _pretty_label(image_name):
+    return Path(image_name).stem.replace("_", " ").strip().title()
+
+# ============================================================
+# LOGGING (1 versie, elapsed-proof)
+# ============================================================
+def _log_found(image_name, area_name, *, elapsed=None, trace=False, trace_depth=5, verbose=True, **_):
+    reset = ANSI["reset"]
+    groen = ANSI["groen"]
+    cyaan = ANSI["cyaan"]
+    paars = ANSI["paars"]
+
+    label = _pretty_label(image_name)
+    t = f" | {elapsed:.2f}s" if elapsed is not None else ""
+
+    msg = (
+        f"{groen}🟢🖼️  Found{reset} | "
+        f"{cyaan}{label}{reset} in "
+        f"{paars}{area_name}{reset}{t}"
+    )
+    log(verbose, msg, trace=trace, depth=trace_depth)
+
+def _log_not_found(image_name, area_name, *, elapsed=None, trace=False, trace_depth=5, verbose=True, **_):
+    reset = ANSI["reset"]
+    rood = ANSI["rood"]
+    cyaan = ANSI["cyaan"]
+    paars = ANSI["paars"]
+
+    label = _pretty_label(image_name)
+    t = f" | {elapsed:.2f}s" if elapsed is not None else ""
+
+    msg = (
+        f"{rood}🔴🖼️  Not found{reset} | "
+        f"{cyaan}{label}{reset} in "
+        f"{paars}{area_name}{reset}{t}"
+    )
+    log(verbose, msg, trace=trace, depth=trace_depth)
+
+# ============================================================
+# BEST MATCH (single best)
+# ============================================================
 def _best_match_in_shot(shot_rgb, tpl_rgb, tpl_gray, method_name):
     gray = cv2.cvtColor(shot_rgb, cv2.COLOR_RGB2GRAY)
     th, tw = tpl_gray.shape[:2]
@@ -134,15 +169,18 @@ def _best_match_in_shot(shot_rgb, tpl_rgb, tpl_gray, method_name):
     best_vorm = 0.0
     best_kleur = 0.0
 
-    for mname, mval in METHODS.items():
-        if method_name != "ALL" and mname != method_name:
+    method_names = list(METHODS.keys()) if method_name == "ALL" else [method_name]
+
+    for mname in method_names:
+        mval = METHODS.get(mname)
+        if mval is None:
             continue
 
         res = cv2.matchTemplate(gray, tpl_gray, mval)
         scoremap = _scoremap_0_1(res, mname)
         _, score, _, loc = cv2.minMaxLoc(scoremap)
 
-        vorm = float(score * 100)
+        vorm = float(score * 100.0)
         rx, ry = int(loc[0]), int(loc[1])
 
         patch = shot_rgb[ry:ry + th, rx:rx + tw]
@@ -159,47 +197,21 @@ def _best_match_in_shot(shot_rgb, tpl_rgb, tpl_gray, method_name):
     return best_loc, round(best_vorm, 2), round(best_kleur, 2)
 
 # ============================================================
-# LOGGING (jouw stijl)
+# SINGLE PASS CORE ✅ (geen detect_images dependency)
 # ============================================================
-def _pretty_label(image_name):
-    return Path(image_name).stem.replace("_", " ").strip().title()
-
-def _log_found(image_name, area_name):
-    reset = ANSI["reset"]
-    groen = ANSI["groen"]
-    cyaan = ANSI["cyaan"]
-    paars = ANSI["paars"]
-
-    label = _pretty_label(image_name)
-
-    print(
-        f"{groen}🟢🖼️  Found{reset} | "
-        f"{cyaan}{label}{reset} in "
-        f"{paars}{area_name}{reset}"
-    )
-
-def _log_not_found(image_name, area_name):
-    reset = ANSI["reset"]
-    rood = ANSI["rood"]
-    cyaan = ANSI["cyaan"]
-    paars = ANSI["paars"]
-
-    label = _pretty_label(image_name)
-
-    print(
-        f"{rood}🔴🖼️  Not found{reset} | "
-        f"{cyaan}{label}{reset} in "
-        f"{paars}{area_name}{reset}"
-    )
-
-# ============================================================
-# API
-# ============================================================
-def detect_image(image_name, area_name, bot_id=1, areas=None, verbose=True):
+def _detect_image_once(
+    image_name,
+    area_name,
+    *,
+    bot_id=1,
+    areas=None,
+    verbose=False,
+    subdir=None,
+):
     cfg = _load_template_settings(image_name)
     method = cfg["method"]
-    min_shape = cfg["min_shape"]
-    min_color = cfg["min_color"]
+    min_shape = float(cfg["min_shape"])
+    min_color = float(cfg["min_color"])
 
     areas = areas or load_areas()
     if area_name not in areas:
@@ -210,51 +222,87 @@ def detect_image(image_name, area_name, bot_id=1, areas=None, verbose=True):
 
     x1, y1, x2, y2 = map(int, apply_offset(areas[area_name], bot_id))
     w, h = x2 - x1, y2 - y1
+    if w <= 1 or h <= 1:
+        return None
 
     shot = _grab_area_rgb(x1, y1, w, h)
     loc, vorm, kleur = _best_match_in_shot(shot, tpl_rgb, tpl_gray, method)
 
-    ok = (loc is not None and vorm >= min_shape and kleur >= min_color)
-
-    if verbose:
-        if ok:
-            _log_found(image_name, area_name)
-        else:
-            _log_not_found(image_name, area_name)
-
-    if not ok:
+    if not loc:
         return None
 
-    rx, ry = loc
+    if float(vorm) < float(min_shape):
+        return None
+    if float(kleur) < float(min_color):
+        return None
+
+    rx, ry = int(loc[0]), int(loc[1])
+
     return Hit(
         x=x1 + rx,
         y=y1 + ry,
         width=tw,
         height=th,
-        vorm=vorm,
-        kleur=kleur,
+        vorm=round(float(vorm), 2),
+        kleur=round(float(kleur), 2),
     )
 
-def detect_image_timeout(image_name, area_name, bot_id=1, timeout_sec=3, sleep_sec=0.1, areas=None, verbose=True):
+# ============================================================
+# API ✅ detect_image met ingebouwde timeout
+# ============================================================
+def detect_image(
+    image_name,
+    area_name,
+    bot_id=1,
+    areas=None,
+    verbose=True,
+    subdir=None,
+    timeout=None,
+    interval=1.0,
+    trace=False,
+    trace_depth=5,
+):
     start = time.time()
 
-    while time.time() - start < float(timeout_sec):
-        hit = detect_image(image_name, area_name, bot_id=bot_id, areas=areas, verbose=False)
-        if hit:
-            if verbose:
-                _log_found(image_name, area_name)
-            return hit
-        time.sleep(float(sleep_sec))
+    hit = _detect_image_once(
+        image_name,
+        area_name,
+        bot_id=bot_id,
+        areas=areas,
+        subdir=subdir,
+    )
+    if hit:
+        verbose and _log_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=True)
+        return hit
 
-    if verbose:
-        _log_not_found(image_name, area_name)
+    if timeout is None or float(timeout) <= 0:
+        verbose and _log_not_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=True)
+        return None
+
+    end = start + float(timeout)
+    sleep_s = max(0.01, float(interval))
+
+    while time.time() < end:
+        time.sleep(sleep_s)
+
+        hit = _detect_image_once(
+            image_name,
+            area_name,
+            bot_id=bot_id,
+            areas=areas,
+            subdir=subdir,
+        )
+        if hit:
+            verbose and _log_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=True)
+            return hit
+
+    verbose and _log_not_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=True)
     return None
 
+# ============================================================
+# API ✅ detect_images (jouw multi-hit)
+# ============================================================
 def detect_images(image_name, area_name, bot_id=1, areas=None, verbose=True, max_hits=60, nms_radius=0):
-    """
-    Vind ALLE hits (met dezelfde template settings als detect_image).
-    Geeft list[Hit] terug met absolute coords.
-    """
     cfg = _load_template_settings(image_name)
     method = cfg["method"]
     min_shape = cfg["min_shape"]
@@ -338,15 +386,12 @@ def detect_images(image_name, area_name, bot_id=1, areas=None, verbose=True, max
 
     if verbose:
         if hits:
-            _log_found(image_name, area_name)
+            _log_found(image_name, area_name, verbose=True)
             print(f"✅ hits: {len(hits)}")
         else:
-            _log_not_found(image_name, area_name)
+            _log_not_found(image_name, area_name, verbose=True)
 
     return hits
-
-
-
 
 # ============================================================
 # CLI TEST
@@ -355,4 +400,5 @@ if __name__ == "__main__":
     print("⚠️ CLI test: zorg dat je doelvenster zichtbaar is. Start in 2s...")
     time.sleep(2)
 
-    detect_image("xp.png", "Info_Area", bot_id=1, verbose=True)
+    hit = detect_image("xp.png", "Info_Area", bot_id=1, verbose=True, timeout=5, interval=1.0)
+    print(f"🏁 Result: {'OK ✅' if hit else 'FAIL ❌'}")

@@ -1,0 +1,13 @@
+{
+  "status": "unknown",
+  "runtime_s": 0,
+  "bot_id": 3,
+  "updated_at": "2026-01-21T13:10:28.202077Z",
+  "active": false,
+  "ui_status": "done",
+  "script": "woodcutting.py",
+  "script_path": "C:\\Users\\Hesse\\Desktop\\Runescape\\scripts\\woodcutting.py",
+  "started_at": 1769001026.3718088,
+  "last_rc": 0,
+  "ended_at": 1769001028.1889324
+}

@@ -28,10 +28,10 @@
   },
   "Inventory_Area": {
     "coords": [
-      626,
-      227,
-      819,
-      494
+      631,
+      238,
+      821,
+      493
     ],
     "group": "default"
   },
@@ -134,15 +134,6 @@
     ],
     "group": "default"
   },
-  "NieuwGebied_3": {
-    "coords": [
-      100,
-      100,
-      200,
-      200
-    ],
-    "group": "default"
-  },
   "Woodcutting": {
     "coords": [
       757,
@@ -152,30 +143,12 @@
     ],
     "group": "Skilling"
   },
-  "NieuwGebied_2": {
-    "coords": [
-      756,
-      294,
-      817,
-      324
-    ],
-    "group": "SKilling"
-  },
   "Fishing": {
     "coords": [
       757,
       293,
       820,
       326
-    ],
-    "group": "Skilling"
-  },
-  "NieuwGebied_4": {
-    "coords": [
-      100,
-      100,
-      200,
-      200
     ],
     "group": "Skilling"
   },
@@ -187,5 +160,302 @@
       535
     ],
     "group": "default"
+  },
+  "Slider_Area": {
+    "coords": [
+      365,
+      205,
+      385,
+      225
+    ],
+    "group": "default"
+  },
+  "Bot_Area_Center": {
+    "coords": [
+      277,
+      154,
+      404,
+      260
+    ],
+    "group": "default"
+  },
+  "HP_Area": {
+    "coords": [
+      601,
+      77,
+      624,
+      101
+    ],
+    "group": "default"
+  },
+  "NieuwGebied_2": {
+    "coords": [
+      100,
+      100,
+      200,
+      200
+    ],
+    "group": "default"
+  },
+  "Inventory": {
+    "coords": [
+      637,
+      237,
+      811,
+      491
+    ],
+    "group": "Inventory"
+  },
+  "Inventory_Slot_1": {
+    "coords": [
+      646,
+      245,
+      670,
+      265
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_2": {
+    "coords": [
+      690,
+      245,
+      714,
+      265
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_3": {
+    "coords": [
+      733,
+      245,
+      757,
+      265
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_4": {
+    "coords": [
+      777,
+      245,
+      801,
+      265
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_5": {
+    "coords": [
+      646,
+      281,
+      670,
+      301
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_6": {
+    "coords": [
+      690,
+      281,
+      714,
+      301
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_7": {
+    "coords": [
+      733,
+      281,
+      757,
+      301
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_8": {
+    "coords": [
+      777,
+      281,
+      801,
+      301
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_9": {
+    "coords": [
+      646,
+      317,
+      670,
+      337
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_10": {
+    "coords": [
+      690,
+      317,
+      714,
+      337
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_11": {
+    "coords": [
+      733,
+      317,
+      757,
+      337
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_12": {
+    "coords": [
+      777,
+      317,
+      801,
+      337
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_13": {
+    "coords": [
+      646,
+      354,
+      670,
+      373
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_14": {
+    "coords": [
+      690,
+      354,
+      714,
+      373
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_15": {
+    "coords": [
+      733,
+      354,
+      757,
+      373
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_16": {
+    "coords": [
+      777,
+      354,
+      801,
+      373
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_17": {
+    "coords": [
+      646,
+      390,
+      670,
+      410
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_18": {
+    "coords": [
+      690,
+      390,
+      714,
+      410
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_19": {
+    "coords": [
+      733,
+      390,
+      757,
+      410
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_20": {
+    "coords": [
+      777,
+      390,
+      801,
+      410
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_21": {
+    "coords": [
+      646,
+      426,
+      670,
+      446
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_22": {
+    "coords": [
+      690,
+      426,
+      714,
+      446
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_23": {
+    "coords": [
+      733,
+      426,
+      757,
+      446
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_24": {
+    "coords": [
+      777,
+      426,
+      801,
+      446
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_25": {
+    "coords": [
+      646,
+      462,
+      670,
+      482
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_26": {
+    "coords": [
+      690,
+      462,
+      714,
+      482
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_27": {
+    "coords": [
+      733,
+      462,
+      757,
+      482
+    ],
+    "group": "Inventory_Slots"
+  },
+  "Inventory_Slot_28": {
+    "coords": [
+      777,
+      462,
+      801,
+      482
+    ],
+    "group": "Inventory_Slots"
   }
 }

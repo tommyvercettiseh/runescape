@@ -15,42 +15,56 @@ if str(ROOT) not in sys.path:
 # ============================================================
 from core.click_colour import click_colour
 
+
 # ============================================================
 # ASSIST CLICK TARGET (COLOUR BASED)
-# WAT: Zoekt paars en klikt dicht bij centrum, maar vermijdt mini-objects.
-# WAAROM: Minder kans dat hij op kleine paarse rommel klikt (bloem etc).
 # ============================================================
 def assist_click_target(
     *,
     kleur="paars",
     area="Bot_Area",
     bot_id=1,
+    speed_pct: float = 100.0,
     prefer_center=True,
-    center_bias=0.18,     # iets hoger: liever grotere targets
-    min_size=80,          # hoger: negeert kleine paarse blobs
-    jitter_range=10,      # nieuw: klik nét eromheen (menselijker)
+    center_bias=0.18,
+    min_size=80,
+    jitter_range=1,
     dilate_px=2,
+    deep_erode_px=5,
+    mode="deep_random",
     verbose=True,
+
+    # ✅ nieuw (maar defaults houden alles exact hetzelfde)
+    pick_strategy: str = "random",     # "random" | "nearest"
+    nearest_k: int = 200,
+    nearest_weighted: bool = True,
 ) -> bool:
 
     if verbose:
         print("🟣 Target zoeken via kleurdetectie (centrum + anti-rommel)")
 
     ok = click_colour(
-        kleur=kleur,
-        area_name=area,
+        kleur,
+        area,
         bot_id=bot_id,
+        mode=mode,
+        deep_erode_px=deep_erode_px,
+        jitter_range=jitter_range,
+        min_size=min_size,
+        dilate_px=dilate_px,
         prefer_center=prefer_center,
         center_bias=center_bias,
-        min_size=min_size,
-        jitter_range=jitter_range,
-        dilate_px=dilate_px,
+        speed_pct=speed_pct,
         verbose=verbose,
+
+        # ✅ doorgeven aan click_colour
+        pick_strategy=pick_strategy,
+        nearest_k=nearest_k,
+        nearest_weighted=nearest_weighted,
     )
 
     if not ok and verbose:
         print("🫥 Geen target gevonden")
-
     if ok and verbose:
         print("✅ Target aangeklikt")
 
@@ -65,13 +79,19 @@ if __name__ == "__main__":
 
     ok = assist_click_target(
         kleur="paars",
-        area="Bot_Area",
+        area="Bot_Area_Center",
         bot_id=BOT_ID,
+        speed_pct=200,
         prefer_center=True,
         center_bias=0.18,
         min_size=200,
         jitter_range=10,
         verbose=True,
+
+        # ✅ alleen als je het wil activeren
+        pick_strategy="nearest",
+        nearest_k=150,
+        nearest_weighted=True,
     )
 
     print("RESULT:", ok)

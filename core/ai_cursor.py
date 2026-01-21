@@ -7,7 +7,6 @@ from typing import Optional, Tuple, Literal, Protocol
 
 from pynput.mouse import Controller, Button
 
-# 👇 jouw planner (movement) zit hier:
 from core.ai_cursor_movement import (
     plan_move,
     get_default_bounds,
@@ -16,18 +15,27 @@ from core.ai_cursor_movement import (
 )
 
 MouseButton = Literal["left", "right"]
+ClickMode = Literal["hold", "tap", "safe_tap"]
+
 Point = Tuple[int, int]
 Bounds = Tuple[int, int, int, int]
 
 _DEFAULT_MOUSE = Controller()
 
 # =========================
-# MODELS (zelfde als jij had)
+# MODELS
 # =========================
 @dataclass(frozen=True)
 class ClickConfig:
     delay: float = 0.05
     button: MouseButton = "left"
+
+    # Backwards compatible: nieuwe velden hebben defaults
+    mode: ClickMode = "hold"          # "hold" (oud gedrag), "tap", "safe_tap"
+    tap_min_s: float = 0.012          # alleen gebruikt bij tap/safe_tap
+    tap_max_s: float = 0.028          # alleen gebruikt bij tap/safe_tap
+    lock_pos: bool = False            # bij safe_tap: cursor terugzetten op exact punt vóór release
+
 
 @dataclass(frozen=True)
 class SettleConfig:
@@ -38,10 +46,12 @@ class SettleConfig:
     long_min_s: float = 0.22
     long_max_s: float = 0.55
 
+
 @dataclass(frozen=True)
 class PressConfig:
     min_s: float = 0.06
     max_s: float = 0.18
+
 
 @dataclass(frozen=True)
 class RandomMouseConfig:
@@ -88,6 +98,10 @@ def _sleep_jitter(base: float, lo: float, hi: float) -> None:
     time.sleep(d)
 
 
+def _btn(button: MouseButton):
+    return Button.right if button == "right" else Button.left
+
+
 # =========================
 # CORE
 # =========================
@@ -98,6 +112,7 @@ def move_cursor(
     controller: Optional[Controller] = None,
     bounds: Optional[Bounds] = None,
     executor: Optional[MouseExecutor] = None,
+    speed_pct: float = 100.0,
 ) -> Point:
     ex = executor or PynputExecutor(controller)
 
@@ -107,7 +122,8 @@ def move_cursor(
     target = clamp_point((int(pos[0]), int(pos[1])), bounds)
     start = clamp_point(ex.get_pos(), bounds)
 
-    steps = plan_move(start, target, config=config, bounds=bounds)
+    steps = plan_move(start, target, config=config, bounds=bounds, speed_pct=speed_pct)
+
     for st in steps:
         ex.move_abs(st.x, st.y)
         if st.sleep_s:
@@ -127,19 +143,44 @@ def click(
     ex = executor or PynputExecutor(controller)
 
     if button is not None and config.button != button:
-        config = ClickConfig(delay=config.delay, button=button)
+        config = ClickConfig(
+            delay=config.delay,
+            button=button,
+            mode=config.mode,
+            tap_min_s=config.tap_min_s,
+            tap_max_s=config.tap_max_s,
+            lock_pos=config.lock_pos,
+        )
 
     _sleep_jitter(float(config.delay), lo=0.02, hi=0.22)
 
-    # pynput: echte hold timing
+    # Alleen pynput kan echte down/up + timing
     if isinstance(ex, PynputExecutor):
-        btn = Button.right if config.button == "right" else Button.left
+        btn = _btn(config.button)
+
+        # Tap modes: veel korter vasthouden, minder drag
+        if config.mode in ("tap", "safe_tap"):
+            hold_s = random.uniform(float(config.tap_min_s), float(config.tap_max_s))
+            x0, y0 = ex.ctrl.position
+
+            ex.ctrl.press(btn)
+            time.sleep(hold_s)
+
+            if config.mode == "safe_tap" or config.lock_pos:
+                # Lock positie vlak voor release, voorkomt micro-drift
+                ex.ctrl.position = (int(x0), int(y0))
+                time.sleep(0.001)
+
+            ex.ctrl.release(btn)
+            return
+
+        # Hold mode: oud gedrag
         ex.ctrl.press(btn)
         time.sleep(random.uniform(float(press.min_s), float(press.max_s)))
         ex.ctrl.release(btn)
         return
 
-    # andere executors (Arduino etc): “1 click”
+    # Andere executors (Arduino etc)
     ex.click(config.button)
 
 
@@ -149,6 +190,7 @@ def random_mouse_movement(
     controller: Optional[Controller] = None,
     bounds: Optional[Bounds] = None,
     executor: Optional[MouseExecutor] = None,
+    speed_pct: float = 100.0,
 ) -> bool:
     if cfg.chance <= 0:
         return False
@@ -169,7 +211,13 @@ def random_mouse_movement(
         dy = int(radius * random.uniform(0.55, 1.0) * (1 if random.random() < 0.5 else -1))
         x2, y2 = clamp_point((x1 + dx, y1 + dy), bounds)
 
-        move_cursor((x2, y2), controller=controller, bounds=bounds, executor=ex)
+        move_cursor(
+            (x2, y2),
+            controller=controller,
+            bounds=bounds,
+            executor=ex,
+            speed_pct=speed_pct,
+        )
         time.sleep(random.uniform(float(cfg.pause_min), float(cfg.pause_max)))
 
     return True
@@ -188,6 +236,7 @@ def move_and_click(
     settle: SettleConfig = SettleConfig(),
     press: PressConfig = PressConfig(),
     executor: Optional[MouseExecutor] = None,
+    speed_pct: float = 100.0,
 ) -> Point:
     ex = executor or PynputExecutor(controller)
 
@@ -195,12 +244,32 @@ def move_and_click(
         bounds = get_default_bounds()
 
     if click_cfg.button != button:
-        click_cfg = ClickConfig(delay=click_cfg.delay, button=button)
+        click_cfg = ClickConfig(
+            delay=click_cfg.delay,
+            button=button,
+            mode=click_cfg.mode,
+            tap_min_s=click_cfg.tap_min_s,
+            tap_max_s=click_cfg.tap_max_s,
+            lock_pos=click_cfg.lock_pos,
+        )
 
     if rand_cfg is not None and rand_before:
-        random_mouse(cfg=rand_cfg, controller=controller, bounds=bounds, executor=ex)
+        random_mouse_movement(
+            cfg=rand_cfg,
+            controller=controller,
+            bounds=bounds,
+            executor=ex,
+            speed_pct=speed_pct,
+        )
 
-    end_pos = move_cursor(pos, config=motion, controller=controller, bounds=bounds, executor=ex)
+    end_pos = move_cursor(
+        pos,
+        config=motion,
+        controller=controller,
+        bounds=bounds,
+        executor=ex,
+        speed_pct=speed_pct,
+    )
 
     if random.random() < float(settle.chance):
         if random.random() < float(settle.long_chance):
@@ -211,6 +280,12 @@ def move_and_click(
     click(config=click_cfg, controller=controller, press=press, executor=ex)
 
     if rand_cfg is not None and not rand_before:
-        random_mouse(cfg=rand_cfg, controller=controller, bounds=bounds, executor=ex)
+        random_mouse_movement(
+            cfg=rand_cfg,
+            controller=controller,
+            bounds=bounds,
+            executor=ex,
+            speed_pct=speed_pct,
+        )
 
     return end_pos

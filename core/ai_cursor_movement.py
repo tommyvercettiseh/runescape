@@ -61,6 +61,26 @@ def _clamp(v: float, lo: float, hi: float) -> float:
     return lo if v < lo else hi if v > hi else v
 
 
+def _scale_sleep(sleep_s: float, speed_pct: float) -> float:
+    """
+    speed_pct:
+      100 = identiek aan oud gedrag
+      150 = 1.5x sneller (sleep kleiner)
+      50  = 2x langzamer (sleep groter)
+    """
+    try:
+        sp = float(speed_pct)
+    except Exception:
+        sp = 100.0
+
+    if sp <= 0:
+        sp = 1.0
+
+    # bij 100% => factor 1.0 => exact hetzelfde
+    factor = 100.0 / sp
+    return float(sleep_s) * factor
+
+
 def get_virtual_screen_bounds() -> Bounds:
     user32 = ctypes.windll.user32
     SM_XVIRTUALSCREEN = 76
@@ -76,7 +96,6 @@ def get_virtual_screen_bounds() -> Bounds:
 
 
 def get_primary_bounds() -> Bounds:
-    # vermijd pyautogui hier om planner “clean” te houden
     user32 = ctypes.windll.user32
     w = int(user32.GetSystemMetrics(0))
     h = int(user32.GetSystemMetrics(1))
@@ -121,6 +140,7 @@ def plan_move(
     *,
     config: CursorMotionConfig = CursorMotionConfig(),
     bounds: Bounds | None = None,
+    speed_pct: float = 100.0,  # 👈 nieuw (default exact hetzelfde)
 ) -> List[PlannedStep]:
     """
     Planner: maakt een lijst (x,y,sleep) stappen.
@@ -197,7 +217,8 @@ def plan_move(
             fx, fy = tx, ty
 
         xi, yi = clamp_point((int(round(fx)), int(round(fy))), bounds)
-        planned.append(PlannedStep(x=xi, y=yi, sleep_s=_clamp(_pick_tick(), 0.002, 0.02)))
+        base_sleep = _clamp(_pick_tick(), 0.002, 0.02)
+        planned.append(PlannedStep(x=xi, y=yi, sleep_s=_scale_sleep(base_sleep, speed_pct)))
 
     # micro-correct als extra stapjes
     curx, cury = planned[-1].x, planned[-1].y
@@ -211,6 +232,7 @@ def plan_move(
         curx = int(curx + ddx * k)
         cury = int(cury + ddy * k)
         curx, cury = clamp_point((curx, cury), bounds)
-        planned.append(PlannedStep(x=curx, y=cury, sleep_s=_clamp(_pick_tick(), 0.002, 0.02)))
+        base_sleep = _clamp(_pick_tick(), 0.002, 0.02)
+        planned.append(PlannedStep(x=curx, y=cury, sleep_s=_scale_sleep(base_sleep, speed_pct)))
 
     return planned
