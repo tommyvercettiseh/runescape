@@ -27,7 +27,7 @@ if str(ROOT) not in sys.path:
 from typing import Optional, Dict, List, Tuple
 import random
 
-from ai_cursor import move_cursor, click
+from core.ai_cursor import move_cursor, click
 from vision.image_detection import detect_image
 # === END IMPORTS ============================================
 # ============================================================

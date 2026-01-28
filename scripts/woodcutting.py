@@ -50,22 +50,22 @@ from core.helpers.assist_check_experience import assist_check_experience
 from core.helpers.assist_inventory import assist_inventory_empty
 from core.helpers.assist_firemaking import assist_firemaking
 from core.drop_inventory import drop_inventory
-from states.can_start_status import can_continue
+from states.can_start_status import can_start
+from core.helpers.assist_click_tab import assist_click_tab  
 
 # ============================================================
-SKILL = "Woodcutting"
-SKILL_TWO = "Firemaking"
-VERBOSE = False
+SKILL =         "Woodcutting"
+SKILL_TWO =     "Firemaking"
+VERBOSE =        False
 
 # ============================================================
 # MAIN LOOP
 # ============================================================
 def main():
 
-    if not can_continue(bot_id=BOT_ID, verbose=VERBOSE):
+    if not can_start(bot_id=BOT_ID, verbose=VERBOSE):
         return
     # 🚀 hier begint je echte script
-
 
     # ============================
     # CHAT CONTINUE 🚦
@@ -78,16 +78,20 @@ def main():
         assist_click_exclude(bot_id=BOT_ID, verbose=VERBOSE)
         return
 
+    if is_skilling(bot_id=BOT_ID, verbose=VERBOSE):
+        return
+
     # ============================
     # RANDOMIZATION 🎲
     # ============================
     if random.random() < 0.01:
         VERBOSE and print("Checking experience 📊")
-        assist_check_experience(SKILL, bot_id=BOT_ID, verbose=VERBOSE)
+        assist_check_experience(SKILL, SKILL_TWO, bot_id=BOT_ID, verbose=VERBOSE)
 
     # ============================
     # INVENTORY CHECK 🚦
     # ============================
+    assist_click_tab("Inventory", bot_id=BOT_ID, verbose=VERBOSE)
     if assist_inventory_empty(bot_id=BOT_ID, verbose=VERBOSE):
         VERBOSE and print("Inventory niet vol 🟢")
     else:

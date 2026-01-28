@@ -53,6 +53,12 @@ STABLE_CLICK_DELAY = 0.0       # ✅ geen extra delay in click itself
 STABLE_CLICK_HOLD_MIN = 0.006  # ✅ kort vasthouden voorkomt drag
 STABLE_CLICK_HOLD_MAX = 0.014
 
+# =========================
+# PATTERN CONFIG
+# =========================
+PATTERNS = ("E", "3", "W", "N")   # ✅ jouw 4 patronen
+AUTO_PATTERN = "AUTO"            # ✅ speciale waarde voor automatisch kiezen
+
 
 # =========================
 # KEYBOARD (ai_keyboard)
@@ -246,14 +252,117 @@ def refresh_shift(keyboard):
     time.sleep(0.03)
 
 
+def _human_click_delay(min_s: float, max_s: float, jitter: float = 0.0) -> float:
+    a = float(min_s)
+    b = float(max_s)
+    if b < a:
+        a, b = b, a
+
+    base = random.uniform(a, b)
+
+    if jitter and float(jitter) > 0:
+        base += random.uniform(-float(jitter), float(jitter))
+
+    return max(0.0, float(base))
+
+
+def build_slot_order(
+    pattern="E",
+    *,
+    total_slots=28,
+    grid_cols=4,
+    grid_rows=7,
+    seed=None,
+):
+    """
+    Slot-order patronen (1..total_slots)
+
+    "E"  rij voor rij links naar rechts
+    "3"  rij voor rij rechts naar links
+    "W"  snake per rij
+    "N"  snake per kolom
+    "R"  random shuffle
+    """
+    p = (pattern or "E").strip().upper()
+
+    if seed is not None:
+        random.seed(seed)
+
+    def rc_to_idx(r, c):
+        return r * grid_cols + c + 1
+
+    max_cells = grid_cols * grid_rows
+    if total_slots > max_cells:
+        total_slots = max_cells
+
+    order = []
+
+    if p == "E":
+        for r in range(grid_rows):
+            for c in range(grid_cols):
+                idx = rc_to_idx(r, c)
+                if idx <= total_slots:
+                    order.append(idx)
+
+    elif p == "3":
+        for r in range(grid_rows):
+            for c in range(grid_cols - 1, -1, -1):
+                idx = rc_to_idx(r, c)
+                if idx <= total_slots:
+                    order.append(idx)
+
+    elif p == "W":
+        for r in range(grid_rows):
+            cols = range(grid_cols) if (r % 2 == 0) else range(grid_cols - 1, -1, -1)
+            for c in cols:
+                idx = rc_to_idx(r, c)
+                if idx <= total_slots:
+                    order.append(idx)
+
+    elif p == "N":
+        for c in range(grid_cols):
+            rows = range(grid_rows) if (c % 2 == 0) else range(grid_rows - 1, -1, -1)
+            for r in rows:
+                idx = rc_to_idx(r, c)
+                if idx <= total_slots:
+                    order.append(idx)
+
+    elif p == "R":
+        order = list(range(1, total_slots + 1))
+        random.shuffle(order)
+
+    else:
+        order = list(range(1, total_slots + 1))
+
+    return order
+
+
+def _resolve_pattern(pattern, *, allow_random=True):
+    p = (pattern or "").strip().upper()
+    if not p or p == AUTO_PATTERN:
+        return random.choice(PATTERNS) if allow_random else "E"
+    if p in PATTERNS:
+        return p
+    if p == "R":
+        return "R"
+    return "E"
+
+
 # =========================
 # MAIN
 # =========================
 def drop_inventory(
     *,
     bot_id=1,
-    dry_run=True,
-    click_delay=0.02,
+    dry_run=False,
+
+    # BACKWARDS COMPAT (als je dit meegeeft -> fixed delay)
+    click_delay=None,
+
+    # NIEUW (variabele delay)
+    click_delay_min=0.08,
+    click_delay_max=0.18,
+    click_delay_jitter=0.015,
 
     use_shift_drop=True,
 
@@ -282,6 +391,11 @@ def drop_inventory(
     trace=False,
     trace_depth=6,
     debug=True,
+
+    # ✅ nieuw, maar volledig backwards compatible
+    pattern=AUTO_PATTERN,       # standaard auto random
+    pattern_seed=None,          # alleen relevant bij "R"
+    allow_random_pattern=True,  # zet op False als je altijd vaste order wil
 ):
     if seed is not None:
         random.seed(seed)
@@ -289,6 +403,10 @@ def drop_inventory(
     bg_ranges = bg_ranges or BG_RANGES
     exclude_slots = set(exclude_slots or EXCLUDE_SLOTS)
     exclude_images = list(exclude_images or EXCLUDE_IMAGES)
+
+    chosen_pattern = _resolve_pattern(pattern, allow_random=allow_random_pattern)
+    if debug:
+        log(verbose, f"🧩 Pattern: {chosen_pattern}", trace, depth=trace_depth)
 
     data = _load_areas()
     slots = _slot_names(prefix=slot_prefix, total=total_slots)
@@ -329,12 +447,14 @@ def drop_inventory(
         states.append((idx, icon, pct, empty, is_ex))
 
     if debug_grid:
-        log(verbose, "🧪 Inventory grid (🟩 empty | 🟥 drop | 🟦 excluded)", trace, depth=trace_depth)
+        log(verbose, "🧪 Inventory grid (🟩 empty | 🟥 action | 🟦 excluded)", trace, depth=trace_depth)
         for r in range(grid_rows):
             icons = []
             pcts = []
             for c in range(grid_cols):
                 i = r * grid_cols + c
+                if i >= len(states):
+                    continue
                 _, icon, pct, _, _ = states[i]
                 icons.append(icon)
                 pcts.append(f"{pct*100:5.1f}")
@@ -352,7 +472,22 @@ def drop_inventory(
         time.sleep(float(SHIFT_PRESS_DELAY))
 
     try:
-        for idx, icon, pct, empty, is_ex in states:
+        order_seed = pattern_seed if (chosen_pattern == "R") else None
+        order = build_slot_order(
+            chosen_pattern,
+            total_slots=total_slots,
+            grid_cols=grid_cols,
+            grid_rows=grid_rows,
+            seed=order_seed,
+        )
+
+        for idx in order:
+            i = idx - 1
+            if i < 0 or i >= len(states):
+                continue
+
+            _, icon, pct, empty, is_ex = states[i]
+
             if is_ex or empty:
                 continue
 
@@ -360,12 +495,13 @@ def drop_inventory(
             if do_skip:
                 skipped += 1
                 consec_skips += 1
-                debug and log(
-                    verbose,
-                    f"🙈 Skipped drop | Slot={idx} | Consecutive={consec_skips}",
-                    trace,
-                    depth=trace_depth,
-                )
+                if debug:
+                    log(
+                        verbose,
+                        f"🙈 Skipped action | Slot={idx} | Consecutive={consec_skips}",
+                        trace,
+                        depth=trace_depth,
+                    )
                 continue
 
             consec_skips = 0
@@ -373,19 +509,25 @@ def drop_inventory(
             if use_shift_drop and not dry_run and SHIFT_REFRESH_EVERY and (idx % int(SHIFT_REFRESH_EVERY) == 0):
                 refresh_shift(keyboard)
 
-            x1, y1, x2, y2 = slots_xyxy[idx - 1]
+            x1, y1, x2, y2 = slots_xyxy[i]
             cx, cy = _rand_point_in_xyxy(x1, y1, x2, y2, pad=CLICK_PAD_PX)
 
-            debug and log(
-                verbose,
-                f"🧹 {'Shift-' if use_shift_drop else ''}drop slot {idx} | BG={pct*100:.1f}% @({cx},{cy})",
-                trace,
-                depth=trace_depth,
-            )
+            if click_delay is not None:
+                delay = float(click_delay)
+            else:
+                delay = _human_click_delay(click_delay_min, click_delay_max, click_delay_jitter)
+
+            if debug:
+                log(
+                    verbose,
+                    f"🧹 {'Shift-' if use_shift_drop else ''}action slot {idx} | BG={pct*100:.1f}% @({cx},{cy}) | Delay={delay:.3f}s",
+                    trace,
+                    depth=trace_depth,
+                )
 
             if not dry_run:
                 stable_click((cx, cy), button="left")
-                time.sleep(float(click_delay))
+                time.sleep(delay)
 
             dropped.append(idx)
 
@@ -394,14 +536,15 @@ def drop_inventory(
             keyboard.release(Key.shift)
             time.sleep(0.02)
 
-    debug and log(
-        verbose,
-        f"📊 Dropped={len(dropped)} | Skipped={skipped} | Skip%={skip_chance*100:.1f}% | MaxConsec={max_consecutive_skips}",
-        trace,
-        depth=trace_depth,
-    )
+    if debug:
+        log(
+            verbose,
+            f"📊 Done={len(dropped)} | Skipped={skipped} | Skip%={skip_chance*100:.1f}% | MaxConsec={max_consecutive_skips}",
+            trace,
+            depth=trace_depth,
+        )
 
-    log(verbose, f"✅ Dropped slots: {dropped if dropped else '(none)'}", trace, depth=trace_depth)
+    log(verbose, f"✅ Done slots: {dropped if dropped else '(none)'}", trace, depth=trace_depth)
     return dropped
 
 
@@ -409,7 +552,11 @@ if __name__ == "__main__":
     drop_inventory(
         bot_id=1,
         dry_run=False,
-        click_delay=0.02,
+
+        # 🧠 variabele delay (aanrader)
+        click_delay_min=0.09,
+        click_delay_max=0.17,
+        click_delay_jitter=0.015,
 
         use_shift_drop=True,
 
@@ -430,4 +577,8 @@ if __name__ == "__main__":
 
         timeout=1.0,
         interval=0.25,
+
+        # ✅ nieuw
+        pattern="AUTO",            # kiest random uit E 3 W N
+        allow_random_pattern=True, # zet op False om vaste order te forceren
     )

@@ -18,30 +18,67 @@ from core.click_colour import click_colour
 
 # ============================================================
 # ASSIST CLICK TARGET (COLOUR BASED)
+# Backwards compatible: accepteert oude/extra kwargs zonder crash
+# Default tuning:
+#   jitter_range = 2
+#   deep_erode_px = 3
 # ============================================================
 def assist_click_target(
     *,
     kleur="paars",
     area="Bot_Area",
     bot_id=1,
-    speed_pct: float = 100.0,
+
+    speed_pct=100.0,
     prefer_center=True,
     center_bias=0.18,
+
     min_size=80,
-    jitter_range=1,
+    jitter_range=0,          # ✅ jouw default
     dilate_px=2,
-    deep_erode_px=5,
+    deep_erode_px=8,         # ✅ jouw default
     mode="deep_random",
+
     verbose=True,
 
-    # ✅ nieuw (maar defaults houden alles exact hetzelfde)
-    pick_strategy: str = "random",     # "random" | "nearest"
-    nearest_k: int = 200,
-    nearest_weighted: bool = True,
-) -> bool:
+    # optioneel (blijft bestaan, maar hoeft niet)
+    pick_strategy="random",  # "random" | "nearest"
+    nearest_k=200,
+    nearest_weighted=True,
+
+    # ✅ legacy-safe: slik alles in wat oudere code eventueel meestuurt
+    **_legacy,
+):
+    # ------------------------------------------------------------
+    # LEGACY ALIASES (oude param namen blijven werken)
+    # ------------------------------------------------------------
+    # Veel voorkomende varianten:
+    # colour/color -> kleur
+    # area_name    -> area
+    # min_px       -> min_size
+    # erode_px     -> deep_erode_px
+    # dilate       -> dilate_px
+    if "colour" in _legacy and kleur == "paars":
+        kleur = _legacy["colour"]
+    if "color" in _legacy and kleur == "paars":
+        kleur = _legacy["color"]
+    if "area_name" in _legacy and area == "Bot_Area":
+        area = _legacy["area_name"]
+
+    if "min_px" in _legacy and min_size == 80:
+        min_size = _legacy["min_px"]
+
+    if "erode_px" in _legacy and deep_erode_px == 3:
+        deep_erode_px = _legacy["erode_px"]
+    if "dilate" in _legacy and dilate_px == 2:
+        dilate_px = _legacy["dilate"]
+
+    # Sommige oude scripts sturen misschien "min_size_px" ofzo
+    if "min_size_px" in _legacy and min_size == 80:
+        min_size = _legacy["min_size_px"]
 
     if verbose:
-        print("🟣 Target zoeken via kleurdetectie (centrum + anti-rommel)")
+        print(f"🎯 Assist_Click_Target | kleur={kleur} | area={area} | min_size={min_size}")
 
     ok = click_colour(
         kleur,
@@ -57,7 +94,7 @@ def assist_click_target(
         speed_pct=speed_pct,
         verbose=verbose,
 
-        # ✅ doorgeven aan click_colour
+        # optioneel doorgeven
         pick_strategy=pick_strategy,
         nearest_k=nearest_k,
         nearest_weighted=nearest_weighted,
@@ -75,23 +112,11 @@ def assist_click_target(
 # TEST
 # ============================================================
 if __name__ == "__main__":
-    BOT_ID = 1
-
     ok = assist_click_target(
-        kleur="paars",
+        kleur="cyaan",
         area="Bot_Area_Center",
-        bot_id=BOT_ID,
-        speed_pct=200,
-        prefer_center=True,
-        center_bias=0.18,
-        min_size=200,
-        jitter_range=10,
+        bot_id=1,
+        min_size=100,        # ✅ voorbeeld: dit is wat jij wil kunnen doen
         verbose=True,
-
-        # ✅ alleen als je het wil activeren
-        pick_strategy="nearest",
-        nearest_k=150,
-        nearest_weighted=True,
     )
-
     print("RESULT:", ok)

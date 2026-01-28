@@ -29,5 +29,9 @@ from ai_keyboard import press_key
 def assist_hop_world(bot_id=1):
     move_in_area("Chat_Area", bot_id=bot_id, verbose=False, padding=3)
     click()
-    random_sleep()
+    sleep_custom(0.124546, 1.9992)
     press_key("q") 
+    sleep_custom(8.124546, 9.9992)
+
+if __name__ == "__main__":
+    assist_hop_world(bot_id=1)

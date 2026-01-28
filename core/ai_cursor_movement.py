@@ -1,4 +1,5 @@
 ﻿from __future__ import annotations
+
 import time
 import random
 import math
@@ -10,7 +11,7 @@ Point = Tuple[int, int]
 Bounds = Tuple[int, int, int, int]
 
 # ============================================================
-# TWEAKS (zelfde als jij nu hebt)
+# TWEAKS
 # ============================================================
 USE_VIRTUAL_BOUNDS = True
 MAX_DURATION_PER_MOVE = 1.65
@@ -76,7 +77,6 @@ def _scale_sleep(sleep_s: float, speed_pct: float) -> float:
     if sp <= 0:
         sp = 1.0
 
-    # bij 100% => factor 1.0 => exact hetzelfde
     factor = 100.0 / sp
     return float(sleep_s) * factor
 
@@ -140,7 +140,7 @@ def plan_move(
     *,
     config: CursorMotionConfig = CursorMotionConfig(),
     bounds: Bounds | None = None,
-    speed_pct: float = 100.0,  # 👈 nieuw (default exact hetzelfde)
+    speed_pct: float = 100.0,
 ) -> List[PlannedStep]:
     """
     Planner: maakt een lijst (x,y,sleep) stappen.
@@ -170,7 +170,6 @@ def plan_move(
     min_steps_for_cap = int(math.ceil(dist / MAX_STEP_PX))
     steps = max(steps, min_steps_for_cap)
 
-    # curve control point
     if dist < 90:
         cx = x1 + dx * 0.5
         cy = y1 + dy * 0.5
@@ -220,7 +219,6 @@ def plan_move(
         base_sleep = _clamp(_pick_tick(), 0.002, 0.02)
         planned.append(PlannedStep(x=xi, y=yi, sleep_s=_scale_sleep(base_sleep, speed_pct)))
 
-    # micro-correct als extra stapjes
     curx, cury = planned[-1].x, planned[-1].y
     for _ in range(10):
         ddx = x2 - curx
@@ -236,3 +234,85 @@ def plan_move(
         planned.append(PlannedStep(x=curx, y=cury, sleep_s=_scale_sleep(base_sleep, speed_pct)))
 
     return planned
+
+
+# ============================================================
+# RANDOM MOUSE MOVEMENT (AREA-BASED)
+# ============================================================
+def random_mouse(
+    min_sec,
+    max_sec,
+    area,
+    *,
+    bot_id=1,
+    pack=None,
+    padding=6,
+    verbose=False,
+    speed_pct=100.0,
+) -> bool:
+    """
+    Random mouse movement binnen een area (met bot offset) voor min_sec..max_sec seconden.
+
+    Aanroep:
+      random_mouse_movement(1, 4, "Bot Area", verbose=VERBOSE, bot_id=1)
+    """
+
+    from core.bot_offsets import load_areas, apply_offset
+    import importlib
+
+    # circular-import safe
+    ai = importlib.import_module("core.ai_cursor")
+    move_cursor = ai.move_cursor
+
+    areas = load_areas(pack)
+
+    key = str(area).lower()
+    area_map = {k.lower(): k for k in areas}
+    if key not in area_map:
+        if verbose:
+            print(f"❌ random_mouse_movement: area '{area}' niet gevonden")
+        return False
+
+    name = area_map[key]
+    x1, y1, x2, y2 = apply_offset(areas[name], int(bot_id))
+
+    left = int(x1 + padding)
+    top = int(y1 + padding)
+    right = int(x2 - padding - 1)
+    bottom = int(y2 - padding - 1)
+
+    if right <= left or bottom <= top:
+        if verbose:
+            print("❌ random_mouse_movement: area te klein na padding")
+        return False
+
+    bounds = (left, top, right + 1, bottom + 1)
+
+    total_time = random.uniform(float(min_sec), float(max_sec))
+    deadline = time.time() + total_time
+
+    if verbose:
+        print(f"🌀 Random mouse movement '{name}' bot={bot_id} ~{total_time:.2f}s")
+
+    moves = 0
+    while time.time() < deadline:
+        tx = random.randint(left, right)
+        ty = random.randint(top, bottom)
+
+        seg_time = random.uniform(0.12, 0.45)
+        motion = CursorMotionConfig(duration=float(seg_time))
+
+        move_cursor(
+            (tx, ty),
+            config=motion,
+            bounds=bounds,
+            speed_pct=float(speed_pct),
+        )
+
+        moves += 1
+        time.sleep(random.uniform(0.02, 0.10))
+
+    if verbose:
+        print(f"✅ random_mouse_movement done ({moves} moves)")
+
+    return True

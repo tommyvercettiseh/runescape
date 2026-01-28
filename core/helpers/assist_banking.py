@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
 from core.click_image import click_image
 from vision.image_detection import detect_image
 from helpers.random_sleep import random_sleep
-
+from core.helpers.assist_target import assist_target
 # ============================================================
 # ASSIST BANKING
 # ============================================================
@@ -25,13 +25,12 @@ def assist_banking(
     attempts=2,
 ):
     BANK_OPEN_IMG = "Bank_Deposit.png"
-    TARGET_IMG = "Cyaan.png"
     AREA = "Bot_Area"
 
     # 🔍 Bank al open?
     if detect_image(BANK_OPEN_IMG, AREA, bot_id, verbose=False):
         if verbose:
-            print("🏦 Bank is al open ✅")
+            print("✅ 🏦 Bank is al open ")
         return True
 
     # ⏳ Wachten tot bank open (max timeout_s)
@@ -56,24 +55,7 @@ def assist_banking(
     for attempt in range(attempts):
         if verbose:
             print(f"🏦 Bank openen, poging {attempt + 1}/{attempts}")
-
-        use_right = random.random() < 0.5
-
-        # 🎲 50/50 click
-        if use_right:
-            if verbose:
-                print("🖱️ RIGHT click")
-            clicked = click_image(TARGET_IMG, AREA, bot_id, button="right", verbose=False)
-
-            if clicked:
-                random_sleep()
-                click_image("Banking_Bank_Booth", AREA, bot_id, verbose=False)
-                random_sleep()
-        else:
-            if verbose:
-                print("🖱️ LEFT click")
-            click_image(TARGET_IMG, AREA, bot_id, verbose=False)
-            random_sleep()
+            assist_target(kleur="cyaan", area="Bot_Area", bot_id=1, min_size=100, max_passes=2, verbose=True)
 
         # ✅ Check resultaat
         if wait_for_bank_open():

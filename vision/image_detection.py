@@ -44,6 +44,23 @@ META_FILE = Path(CONFIG_DIR) / "templates_meta.json"
 _TEMPLATE_CACHE = {}
 
 # ============================================================
+# VERBOSE HELPERS
+# ============================================================
+def _is_verbose(v):
+    if v is True:
+        return True
+    if v is False or v is None:
+        return False
+    if isinstance(v, (int, float)):
+        return v != 0
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in ("off", "false", "0", "no", "none", ""):
+            return False
+        return True
+    return bool(v)
+
+# ============================================================
 # HIT
 # ============================================================
 class Hit:
@@ -124,9 +141,12 @@ def _pretty_label(image_name):
     return Path(image_name).stem.replace("_", " ").strip().title()
 
 # ============================================================
-# LOGGING (1 versie, elapsed-proof)
+# LOGGING
 # ============================================================
 def _log_found(image_name, area_name, *, elapsed=None, trace=False, trace_depth=5, verbose=True, **_):
+    if not _is_verbose(verbose):
+        return
+
     reset = ANSI["reset"]
     groen = ANSI["groen"]
     cyaan = ANSI["cyaan"]
@@ -140,9 +160,12 @@ def _log_found(image_name, area_name, *, elapsed=None, trace=False, trace_depth=
         f"{cyaan}{label}{reset} in "
         f"{paars}{area_name}{reset}{t}"
     )
-    log(verbose, msg, trace=trace, depth=trace_depth)
+    log(True, msg, trace=trace, depth=trace_depth)
 
 def _log_not_found(image_name, area_name, *, elapsed=None, trace=False, trace_depth=5, verbose=True, **_):
+    if not _is_verbose(verbose):
+        return
+
     reset = ANSI["reset"]
     rood = ANSI["rood"]
     cyaan = ANSI["cyaan"]
@@ -156,7 +179,12 @@ def _log_not_found(image_name, area_name, *, elapsed=None, trace=False, trace_de
         f"{cyaan}{label}{reset} in "
         f"{paars}{area_name}{reset}{t}"
     )
-    log(verbose, msg, trace=trace, depth=trace_depth)
+    log(True, msg, trace=trace, depth=trace_depth)
+
+def _log_hits_count(n, *, trace=False, trace_depth=5, verbose=True):
+    if not _is_verbose(verbose):
+        return
+    log(True, f"✅ hits: {int(n)}", trace=trace, depth=trace_depth)
 
 # ============================================================
 # BEST MATCH (single best)
@@ -197,7 +225,7 @@ def _best_match_in_shot(shot_rgb, tpl_rgb, tpl_gray, method_name):
     return best_loc, round(best_vorm, 2), round(best_kleur, 2)
 
 # ============================================================
-# SINGLE PASS CORE ✅ (geen detect_images dependency)
+# SINGLE PASS CORE
 # ============================================================
 def _detect_image_once(
     image_name,
@@ -230,7 +258,6 @@ def _detect_image_once(
 
     if not loc:
         return None
-
     if float(vorm) < float(min_shape):
         return None
     if float(kleur) < float(min_color):
@@ -248,7 +275,7 @@ def _detect_image_once(
     )
 
 # ============================================================
-# API ✅ detect_image met ingebouwde timeout
+# API detect_image
 # ============================================================
 def detect_image(
     image_name,
@@ -262,6 +289,7 @@ def detect_image(
     trace=False,
     trace_depth=5,
 ):
+    v = _is_verbose(verbose)
     start = time.time()
 
     hit = _detect_image_once(
@@ -272,11 +300,11 @@ def detect_image(
         subdir=subdir,
     )
     if hit:
-        verbose and _log_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=True)
+        _log_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=v)
         return hit
 
     if timeout is None or float(timeout) <= 0:
-        verbose and _log_not_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=True)
+        _log_not_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=v)
         return None
 
     end = start + float(timeout)
@@ -293,20 +321,32 @@ def detect_image(
             subdir=subdir,
         )
         if hit:
-            verbose and _log_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=True)
+            _log_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=v)
             return hit
 
-    verbose and _log_not_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=True)
+    _log_not_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=v)
     return None
 
 # ============================================================
-# API ✅ detect_images (jouw multi-hit)
+# API detect_images
 # ============================================================
-def detect_images(image_name, area_name, bot_id=1, areas=None, verbose=True, max_hits=60, nms_radius=0):
+def detect_images(
+    image_name,
+    area_name,
+    bot_id=1,
+    areas=None,
+    verbose=True,
+    max_hits=60,
+    nms_radius=0,
+    trace=False,
+    trace_depth=5,
+):
+    v = _is_verbose(verbose)
+
     cfg = _load_template_settings(image_name)
     method = cfg["method"]
-    min_shape = cfg["min_shape"]
-    min_color = cfg["min_color"]
+    min_shape = float(cfg["min_shape"])
+    min_color = float(cfg["min_color"])
 
     areas = areas or load_areas()
     if area_name not in areas:
@@ -317,6 +357,9 @@ def detect_images(image_name, area_name, bot_id=1, areas=None, verbose=True, max
 
     x1, y1, x2, y2 = map(int, apply_offset(areas[area_name], bot_id))
     w, h = x2 - x1, y2 - y1
+    if w <= 1 or h <= 1:
+        _log_not_found(image_name, area_name, trace=trace, trace_depth=trace_depth, verbose=v)
+        return []
 
     shot = _grab_area_rgb(x1, y1, w, h)
     gray = cv2.cvtColor(shot, cv2.COLOR_RGB2GRAY)
@@ -327,7 +370,10 @@ def detect_images(image_name, area_name, bot_id=1, areas=None, verbose=True, max
     hits = []
 
     for mname in method_names:
-        mval = METHODS[mname]
+        mval = METHODS.get(mname)
+        if mval is None:
+            continue
+
         res = cv2.matchTemplate(gray, tpl_gray, mval)
         scoremap = _scoremap_0_1(res, mname)
 
@@ -384,12 +430,11 @@ def detect_images(image_name, area_name, bot_id=1, areas=None, verbose=True, max
         if len(hits) >= int(max_hits):
             break
 
-    if verbose:
-        if hits:
-            _log_found(image_name, area_name, verbose=True)
-            print(f"✅ hits: {len(hits)}")
-        else:
-            _log_not_found(image_name, area_name, verbose=True)
+    if hits:
+        _log_found(image_name, area_name, trace=trace, trace_depth=trace_depth, verbose=v)
+        _log_hits_count(len(hits), trace=trace, trace_depth=trace_depth, verbose=v)
+    else:
+        _log_not_found(image_name, area_name, trace=trace, trace_depth=trace_depth, verbose=v)
 
     return hits
 

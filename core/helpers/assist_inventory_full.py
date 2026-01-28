@@ -246,8 +246,8 @@ if __name__ == "__main__":
     is_full = inventory_full(
         bot_id=1,
         exclude_slots={1},
-        exclude_images=["Item_Tinderbox.png", "Item_Axe.png"],
-        timeout=1.0,
+        exclude_images=["Item_SmallFishingNet.png",],
+        timeout=0.0,
         interval=0.25,
         trace=True,
         trace_depth=7,

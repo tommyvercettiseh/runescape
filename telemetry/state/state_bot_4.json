@@ -1,13 +1,11 @@
 {
-  "status": "unknown",
-  "runtime_s": 0,
-  "bot_id": 4,
-  "updated_at": "2026-01-21T13:07:45.223427Z",
   "active": false,
-  "ui_status": "fail",
+  "ui_status": "done",
   "script": "woodcutting.py",
   "script_path": "C:\\Users\\Hesse\\Desktop\\Runescape\\scripts\\woodcutting.py",
-  "started_at": 1769000861.7901855,
-  "last_rc": 1,
-  "ended_at": 1769000865.2097874
+  "started_at": 1769605587.6477778,
+  "bot_id": 4,
+  "updated_at": "2026-01-28T13:06:28.678028Z",
+  "last_rc": 0,
+  "ended_at": 1769605588.6642144
 }

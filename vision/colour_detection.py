@@ -126,7 +126,6 @@ def _build_mask(hsv, colour):
     return mask
 
 def _largest_blob_area(mask_u8):
-    # mask_u8 moet 0/255 of 0/1 zijn; we maken 'm hier veilig binair
     bin_u8 = (mask_u8 > 0).astype(np.uint8)
     num, _, stats, _ = cv2.connectedComponentsWithStats(bin_u8, connectivity=8)
     if num <= 1:
@@ -150,7 +149,6 @@ def _line(colour, area, bot_id, percent, threshold, biggest, min_size, ok):
     pct_txt = _fmt_pct(percent)
     pct_req = f"Min {_fmt_pct(threshold)}%" if threshold is not None else "Min n/a"
 
-    # ✅ ALTIJD blob tonen
     if min_size and min_size > 0:
         blob_txt = f" | Blob {biggest}px (min {min_size})"
     else:
@@ -162,6 +160,33 @@ def _line(colour, area, bot_id, percent, threshold, biggest, min_size, ok):
         f"{area_ansi}{area}{reset} | "
         f"{pct_txt}% | {pct_req} | Bot {bot_id}{blob_txt}"
     )
+
+def _debug_line(colour, area, bot_id, percent, biggest, threshold, min_size):
+    reset = ANSI["reset"]
+    kleur_ansi = ANSI.get(colour, "")
+    area_ansi = ANSI["area"]
+    dim = ANSI["dim"]
+
+    thr_txt = "n/a" if threshold is None else f"{_fmt_pct(threshold)}%"
+    ms_txt = "n/a" if not min_size or min_size <= 0 else str(int(min_size))
+
+    return (
+        f"{dim}🧪 Debug{reset} | "
+        f"{kleur_ansi}{colour}{reset} | "
+        f"{area_ansi}{area}{reset} | "
+        f"Bot {bot_id} | "
+        f"pct={_fmt_pct(percent)}% | blob={int(biggest)}px | "
+        f"thr={thr_txt} | min_size={ms_txt}"
+    )
+
+def _make_stats(colour, percent, biggest, threshold, ok):
+    return {
+        "colour": colour,
+        "percent": float(percent),
+        "biggest": int(biggest),
+        "threshold": None if threshold is None else float(threshold),
+        "ok": bool(ok),
+    }
 
 # ============================================================
 # CORE
@@ -179,16 +204,18 @@ def detect_colour(
     interval=0.2,
     trace=False,
     debug=False,
-    return_blob=False,   # ✅ optioneel: return (ok, blob_px)
+    return_blob=False,
+    return_stats=False,    # ✅ nieuw
 ):
     """
-    Print policy:
     verbose=True:
-      fail  -> altijd loggen (met blob px)
-      ok    -> alleen loggen als debug=True (met blob px)
+      fail  -> altijd loggen
+      ok    -> alleen loggen als debug=True
 
-    timeout=0  -> 1 check (instant)
+    timeout=0  -> 1 check
     timeout>0  -> wachten tot ok of timeout
+
+    return_stats=True -> return (ok, stats)
     """
 
     colour = normalize_colour(colour)
@@ -208,11 +235,11 @@ def detect_colour(
 
         if mask is None:
             log(verbose, f"❌ onbekende kleur: {colour}", trace)
+            if return_stats:
+                return False, _make_stats(colour, 0.0, 0, None, False)
             return (False, 0) if return_blob else False
 
         percent = (mask > 0).mean() * 100.0
-
-        # ✅ ALTIJD blob berekenen (zodat je altijd px ziet in logs)
         biggest = _largest_blob_area(mask)
 
         if percentage is not None and percentage > 0:
@@ -225,13 +252,23 @@ def detect_colour(
         if min_size and min_size > 0:
             ok = ok and biggest >= min_size
 
+        # ✅ debug: altijd laten zien hoeveel % en px (handig bij ok én fail)
+        if verbose and debug:
+            log(True, _debug_line(colour, area, bot_id, percent, biggest, threshold, min_size), trace)
+
         if ok:
             if verbose and debug:
-                log(verbose, _line(colour, area, bot_id, percent, threshold, biggest, min_size, True), trace)
+                log(True, _line(colour, area, bot_id, percent, threshold, biggest, min_size, True), trace)
+
+            if return_stats:
+                return True, _make_stats(colour, percent, biggest, threshold, True)
             return (True, biggest) if return_blob else True
 
         if not timeout or timeout <= 0 or time.time() >= t_end:
             log(verbose, _line(colour, area, bot_id, percent, threshold, biggest, min_size, False), trace)
+
+            if return_stats:
+                return False, _make_stats(colour, percent, biggest, threshold, False)
             return (False, biggest) if return_blob else False
 
         time.sleep(interval)
@@ -242,19 +279,19 @@ def detect_colour(
 def detect_colours(
     area,
     bot_id=1,
-    colours=None,          # None = alle kleuren uit COLOR_RANGES_NP
+    colours=None,
     verbose=True,
     blur=3,
     areas=None,
-    min_size=0,            # 0 = geen filter; blobs worden wél gerapporteerd
-    top_n=None,            # None = alles, anders bijv 5
-    sort_by="percent",     # "percent" of "blob"
+    min_size=0,
+    top_n=None,
+    sort_by="percent",
     trace=False,
 ):
     """
     Scant 1 area en geeft per kleur:
       percent: hoeveel % van pixels matcht die kleur
-      biggest: grootste blob (px) altijd berekend
+      biggest: grootste blob (px)
 
     min_size > 0:
       laat alleen kleuren zien waarvan biggest >= min_size
@@ -290,7 +327,7 @@ def detect_colours(
             continue
 
         percent = (mask > 0).mean() * 100.0
-        biggest = _largest_blob_area(mask)   # ✅ altijd blob px
+        biggest = _largest_blob_area(mask)
 
         if min_size and min_size > 0 and biggest < min_size:
             continue
@@ -332,6 +369,26 @@ def detect_colours(
 # TEST
 # ============================================================
 if __name__ == "__main__":
-    # 1) Normaal: alleen fails loggen (rustig) -> mét blob px
-    if detect_colour("rood", "Bot_Area", None, bot_id=1, verbose=True, min_size=75, trace=True):
-        print("Found!")
+    # Voorbeeld 1: debug prints (laat % en blob zien)
+    ok = detect_colour(
+        "groen",
+        "Skilling_Area",
+        percentage=None,
+        bot_id=1,
+        verbose=True,
+        min_size=75,
+        debug=True,
+        trace=True,
+    )
+    print("Found!" if ok else "Not found")
+
+    # Voorbeeld 2: stats terug zonder spam prints
+    ok2, stats = detect_colour(
+        "groen",
+        "Skilling_Area",
+        bot_id=1,
+        verbose=False,
+        min_size=75,
+        return_stats=True,
+    )
+    print("OK:", ok2, "STATS:", stats)

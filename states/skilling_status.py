@@ -23,7 +23,7 @@ def is_skilling(bot_id, verbose=True):
     return detect_colour(
         "groen",
         "Skilling_Area",
-        2,
+        0.008,
         bot_id=bot_id,
         verbose=verbose,
     ) > 0

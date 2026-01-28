@@ -7,7 +7,8 @@
   "Logout_Door.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 0.0
+    "min_color": 50.0,
+    "area": "Tab_Confirmation_Area"
   },
   "Inventory_Selected.png": {
     "method": "TM_CCOEFF_NORMED",
@@ -16,11 +17,6 @@
     "area": "Buttons_Top"
   },
   "Inventory_Unselected.png": {
-    "method": "TM_CCOEFF_NORMED",
-    "min_shape": 95.0,
-    "min_color": 95.0
-  },
-  "Cooked_Trout.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
     "min_color": 95.0
@@ -38,17 +34,20 @@
   "Login_Screen_Play_Now.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 75.0,
+    "area": "Bot_Area"
   },
   "Login_Screen_Play_Now_Red.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 90.0,
-    "min_color": 90.0
+    "min_color": 90.0,
+    "area": "Bot_Area_Full"
   },
   "Login_Screen_Ok.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 70.0,
+    "area": "Bot_Area"
   },
   "Logout_ClickHereToLogout.png": {
     "method": "TM_CCOEFF_NORMED",
@@ -76,9 +75,10 @@
     "min_color": 95.0
   },
   "Ok.png": {
-    "method": "TM_CCOEFF_NORMED",
+    "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 75.0,
+    "area": "Bot_Area_Full"
   },
   "Close_Screen_X.png": {
     "method": "TM_CCOEFF_NORMED",
@@ -444,8 +444,50 @@
   },
   "Icon_Fishing.png": {
     "method": "TM_CCOEFF_NORMED",
-    "min_shape": 95.0,
-    "min_color": 90.0,
+    "min_shape": 98.0,
+    "min_color": 80.0,
     "area": "Info_Area"
+  },
+  "Chat_Area_Corner.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0,
+    "area": "Chat_Area"
+  },
+  "Item_FlyFishingRod.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Feathers.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Lobster.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Trout.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Salmon.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0,
+    "area": "Inventory_Area"
+  },
+  "Login_Screen_Update.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Bot_Area_Full"
   }
 }
