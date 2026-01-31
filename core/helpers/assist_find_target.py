@@ -7,7 +7,7 @@ from pathlib import Path
 import pyautogui
 
 # ============================================================
-# BOOTSTRAP (AUTO: zoekt Runescape root)
+# BOOTSTRAP 🚀 (AUTO: zoekt Runescape root)
 # ============================================================
 HERE = Path(__file__).resolve()
 ROOT = None
@@ -17,14 +17,13 @@ for p in [HERE] + list(HERE.parents):
         break
 
 if ROOT is None:
-    raise SystemExit("❌ Project root niet gevonden (map met 'core' en 'config').")
+    raise SystemExit("❌  📂  Project root niet gevonden   (map met 'core' en 'config').")
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-
 # ============================================================
-# IMPORTS
+# IMPORTS 📥
 # ============================================================
 from ai_keyboard import hold_key_range
 from core.move_to_area import move_to_area
@@ -33,9 +32,8 @@ from helpers.random_sleep import sleep_custom
 from vision.colour_detection import detect_colour
 from vision.colours import normalize_colour
 
-
 # ============================================================
-# KEYMAP
+# KEYMAP ⌨️
 # ============================================================
 ACTION_KEYS = {
     "tilt_up": "up",
@@ -44,14 +42,14 @@ ACTION_KEYS = {
     "rotate_right": "right",
 }
 
-
 # ============================================================
-# RESET VIEW
+# RESET VIEW 🧭
 # ============================================================
 def reset_view(*, bot_id=1, do_scroll=True, scroll_ticks=10, scroll_amount=-240):
     move_to_area("Chat_Area", bot_id=bot_id)
     click()
     sleep_custom(1.10, 2.25)
+
     move_to_area("Bot_Area", bot_id=bot_id)
     sleep_custom(0.10, 0.25)
 
@@ -64,9 +62,8 @@ def reset_view(*, bot_id=1, do_scroll=True, scroll_ticks=10, scroll_amount=-240)
     sleep_custom(0.12, 0.25)
     return True
 
-
 # ============================================================
-# STEP APPLY
+# STEP APPLY 🧩
 # ============================================================
 def apply_step(step: dict, *, bot_id=1):
     stype = str(step.get("type", "hold"))
@@ -93,9 +90,8 @@ def apply_step(step: dict, *, bot_id=1):
     )
     return True
 
-
 # ============================================================
-# DEFAULT SEARCH PLAN
+# DEFAULT SEARCH PLAN 🧠
 # ============================================================
 DEFAULT_SEARCH_PLAN = [
     {"type": "hold", "name": "tilt_up", "min_sec": 2.0, "max_sec": 2.2},
@@ -107,9 +103,8 @@ DEFAULT_SEARCH_PLAN = [
     {"type": "hold", "name": "tilt_down", "min_sec": 0.20, "max_sec": 0.35},
 ]
 
-
 # ============================================================
-# FIND TARGET (NO CLICK)
+# FIND TARGET (NO CLICK) 🔍
 # ============================================================
 def assist_find_target(
     *,
@@ -144,68 +139,81 @@ def assist_find_target(
     plan = search_plan or DEFAULT_SEARCH_PLAN
     start = time.time()
 
+    k = normalize_colour(kleur)  # bv "cyan" -> "cyaan"
+
     def _hits():
-        k = normalize_colour(kleur)  # bv "cyan" -> "cyaan"
         return detect_colour(
             k,
             area,
-            None,            # 👈 belangrijk: geen extra positional "1"
+            None,
             bot_id=bot_id,
             verbose=False,
             min_size=min_size,
         ) or 0
 
-    def _wait(label, pass_nr):
+    def _wait(step_label, pass_nr):
         deadline = time.time() + float(timeout or 0.0)
+        checks = 0
+
         while True:
+            checks += 1
             h = _hits()
+
             if h > 0:
                 return {
                     "found": True,
                     "pass": pass_nr,
-                    "step": label,
+                    "step": step_label,
                     "hits": int(h),
                     "elapsed_s": round(time.time() - start, 3),
                 }
+
             if time.time() >= deadline:
                 return None
+
             time.sleep(float(interval))
 
-    if verbose:
-        print("🔍 Searching target…")
+    # =========================
+    # DIRECT CHECK
+    # =========================
+    verbose and print(f"⏳  🔍  Zoeken naar target   | kleur {k}   (bot {bot_id})")
 
-    hit = _wait("direct", 0)
+    hit = _wait("Direct", 0)
     if hit:
-        if verbose:
-            print("✅ Found (direct)")
+        verbose and print("✅  🔍  Target gevonden      | Direct")
         return hit
 
+    # =========================
+    # PASSES
+    # =========================
     for p in range(int(max_passes)):
         pass_nr = p + 1
+        verbose and print(f"⏳  🔁  Pass {pass_nr}/{max_passes}")
 
         if reset_first:
+            verbose and print("⏳  🧭  Reset view")
             reset_view(bot_id=bot_id)
             time.sleep(float(pause_between))
 
-            hit = _wait("reset", pass_nr)
+            hit = _wait("Reset", pass_nr)
             if hit:
-                if verbose:
-                    print("✅ Found after reset")
+                verbose and print("✅  🔍  Target gevonden      | Reset")
                 return hit
 
         for step in plan:
             label = step.get("name", step.get("type", "?"))
+            label_txt = str(label).replace("_", " ").title()
+
+            verbose and print(f"⏳  🧩  Step uitvoeren        | {label_txt}")
             apply_step(step, bot_id=bot_id)
             time.sleep(float(pause_between))
 
-            hit = _wait(label, pass_nr)
+            hit = _wait(label_txt, pass_nr)
             if hit:
-                if verbose:
-                    print(f"✅ Found after step: {label}")
+                verbose and print(f"✅  🔍  Target gevonden      | {label_txt}")
                 return hit
 
-    if verbose:
-        print("❌ Not found")
+    verbose and print("❌  🔍  Target niet gevonden")
 
     return {
         "found": False,
@@ -215,9 +223,8 @@ def assist_find_target(
         "elapsed_s": round(time.time() - start, 3),
     }
 
-
 # ============================================================
-# TEST
+# TEST 🧪
 # ============================================================
 if __name__ == "__main__":
     res = assist_find_target(
@@ -230,4 +237,5 @@ if __name__ == "__main__":
         interval=0.20,
         verbose=True,
     )
-    print("RESULT:", res)
+    print("\n📊  RESULTAAT:", "✅  GEVONDEN" if res.get("found") else "❌  NIET GEVONDEN")
+    print(res)

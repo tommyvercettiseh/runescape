@@ -21,15 +21,21 @@ def deposit_inventory(
     bot_id=1,
     verbose=True,
 ):
-    
     BANK_OPEN_IMG = "Bank_Deposit.png"
     AREA = "Bot_Area"
 
-    # 🔍 Bank al open?
-    if detect_image(BANK_OPEN_IMG, AREA, bot_id, verbose=False):
+    # 🔍 Bank open?
+    if not detect_image(BANK_OPEN_IMG, AREA, bot_id, verbose=False):
         if verbose:
-            print("✅ 🏦 Bank is al open ")
-            click_image(BANK_OPEN_IMG, "Bot_Area", bot_id, verbose=False)
+            print("❌ 🏦 Bank is niet open (deposit skip)")
+        return False
+
+    if verbose:
+        print("✅ 🏦 Bank is open -> deposit click")
+
+    click_image(BANK_OPEN_IMG, AREA, bot_id, verbose=False)
+    return True
+
 
 # ============================================================
 # MAIN TEST

@@ -21,8 +21,8 @@ def eat_food(
     verbose=True,
 ):
     """
-    Klikt eerste beste item dat gevonden wordt.
-    Bestaat image niet? → overslaan, geen crash.
+    Klikt het eerste eetbare item dat gevonden wordt.
+    Ontbrekende images worden netjes overgeslagen.
     """
 
     if not Item_images:
@@ -36,35 +36,35 @@ def eat_food(
             "Item_Shark.png",
         ]
 
-    for _ in range(int(attempts)):
+    verbose and print("⏳  🍗  Zoeken naar voedsel")
+
+    for attempt in range(int(attempts)):
         random.shuffle(Item_images)
+        verbose and print(f"⏳  🍗  Poging {attempt + 1}/{attempts}")
 
         for img in Item_images:
             try:
                 found = detect_image(img, area, bot_id, verbose=False)
             except FileNotFoundError:
-                if verbose:
-                    print(f"⚠️ Template ontbreekt: {img} → skip")
+                verbose and print(f"⚠️  🖼️  Image ontbreekt     | {img}")
                 continue
 
             if found:
-                if verbose:
-                    print(f"🍗 Item gevonden: {img} → eten")
+                verbose and print(f"✅  🍗  Gegeten             | {img}")
                 click_image(img, area, bot_id, verbose=False)
                 return True
 
-    if verbose:
-        print("⚠️ Geen Item gevonden")
+    verbose and print("❌  🍗  Geen voedsel gevonden")
     return False
 
 
 # ============================================================
-# MAIN TEST
+# TEST 🧪
 # ============================================================
 if __name__ == "__main__":
     BOT_ID = 1
 
-    print("🧪 Test eat_food")
+    print("🧪  Test eat_food\n")
 
     result = eat_food(
         bot_id=BOT_ID,
@@ -78,4 +78,4 @@ if __name__ == "__main__":
         verbose=True,
     )
 
-    print("RESULT:", result)
+    print("\n📊  RESULTAAT:", "✅  SUCCES" if result else "❌  GEFAALD")

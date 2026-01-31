@@ -8,12 +8,14 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 # ============================================================
-# IMPORTS
+# IMPORTS 📥
 # ============================================================
 from states.hp_status import enough_HP
 from core.helpers.assist_eat_food import eat_food
 
-
+# ============================================================
+# DEFAULT FOOD 🍗
+# ============================================================
 DEFAULT_FOOD_IMAGES = [
     "Item_Shrimp.png",
     "Item_Anchovies.png",
@@ -28,7 +30,9 @@ DEFAULT_FOOD_IMAGES = [
     "Item_MantaRay.png",
 ]
 
-
+# ============================================================
+# ASSIST HEALTH ❤️
+# ============================================================
 def assist_health(
     *,
     bot_id=1,
@@ -36,17 +40,18 @@ def assist_health(
     verbose=True,
 ):
     """
-    Assist functie:
-    - gebruikt bestaande hp_status
-    - eet automatisch bij low HP
-    - default foodlijst ingebouwd
+    - Checkt HP status
+    - Eet automatisch bij low HP
+    - Gebruikt default foodlijst indien niets opgegeven
     """
 
+    # 🟢 HP OK
     if enough_HP(bot_id=bot_id, verbose=False):
-        verbose and print("❤️   HP 🟢")
+        verbose and print("✅  ❤️  HP in orde")
         return True
 
-    verbose and print("🆘 Low HP → Eat!")
+    # 🆘 HP laag
+    verbose and print("🆘  ❤️  HP laag   → eten")
 
     ate = eat_food(
         bot_id=bot_id,
@@ -54,21 +59,26 @@ def assist_health(
         verbose=verbose,
     )
 
+    if ate:
+        verbose and print("✅  ❤️  Food")
+    else:
+        verbose and print("❌  ❤️  No food available")
+
     return ate
 
 
 # ============================================================
-# MAIN (standalone test)
+# TEST 🧪
 # ============================================================
 if __name__ == "__main__":
     BOT_ID = 1
     VERBOSE = True
 
-    print("🧪  Test assist_health")
+    print("🧪  Test assist_health\n")
 
     result = assist_health(
         bot_id=BOT_ID,
         verbose=VERBOSE,
     )
 
-    print("RESULT:", result)
+    print("\n📊  RESULTAAT:", "✅  VEILIG" if result else "❌  ONVEILIG")

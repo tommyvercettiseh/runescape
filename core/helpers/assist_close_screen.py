@@ -1,71 +1,72 @@
 ﻿import sys
 from pathlib import Path
-from time import sleep
 import random
 
 # ============================================================
-# IMPORTS
+# BOOTSTRAP 🚀
 # ============================================================
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# ============================================================
+# IMPORTS 📥
+# ============================================================
 from core.click_image import click_image
 from vision.image_detection import detect_image
 from ai_keyboard import press_key
 from helpers.random_sleep import random_sleep
 
 # ============================================================
-# CONFIG
+# CONFIG ⚙️
 # ============================================================
-
 IMAGE = "Close_Screen_X.png"
 AREA = "Bot_Area"
-# ============================================================
 
+# ============================================================
+# ASSIST CLOSE SCREEN 🪟
+# ============================================================
 def assist_close_screen(bot_id=1, verbose=True):
-    # als het niet open is: klaar
+
+    # 🔍 Is er iets open?
     if not detect_image(IMAGE, AREA, bot_id, verbose=False):
-        if verbose:
-            print("🪟  Niks open ✅")
+        verbose and print("✅  🪟  Geen scherm open")
         return True
 
-    # 50/50 keuze
+    # 🎲 50/50 keuze: click of ESC
     use_click = random.random() < 0.5
 
     if use_click:
-        if verbose:
-            print("🎯  Close via click_image")
+        verbose and print("⏳  🪟  Sluiten via click")
         click_image(IMAGE, AREA, bot_id, verbose=False)
 
     else:
-        if verbose:
-            print("⌨️  Close via ESC (50/50)")
+        verbose and print("⏳  🪟  Sluiten via ESC")
         press_key("esc")
         random_sleep()
 
-        # focus fail → nog open? dan 1x click fallback
+        # fallback: ESC faalde
         if detect_image(IMAGE, AREA, bot_id, verbose=False):
-            if verbose:
-                print("😵  ESC faalde, fallback click ✅")
+            verbose and print("⚠️  🪟  ESC faalde   → fallback click")
             click_image(IMAGE, AREA, bot_id, verbose=False)
             random_sleep()
 
-    # eindcheck
+    # 🔁 Eindcheck
     if not detect_image(IMAGE, AREA, bot_id, verbose=False):
-        if verbose:
-            print("🪟  Gesloten ✅")
+        verbose and print("✅  🪟  Scherm gesloten")
         return True
 
-    if verbose:
-        print("⚠️  Nog open")
+    verbose and print("❌  🪟  Sluiten mislukt")
     return False
 
 
 # ============================================================
-
+# TEST 🧪
+# ============================================================
 if __name__ == "__main__":
     BOT_ID = 1
-    print("🧪  Test assist_close_screen")
+    print("🧪  Test assist_close_screen\n")
+
     result = assist_close_screen(bot_id=BOT_ID, verbose=True)
-    print("RESULT:", result)
+
+    print("\n📊  RESULTAAT:", "✅  SUCCES" if result else "❌  GEFAALD")

@@ -229,7 +229,7 @@ def inventory_full(
     full = usable > 0 and filled == usable
 
     if debug_grid:
-        log(verbose, "🧪 Inventory (🟩 empty | 🟥 filled | 🟦 excluded)", trace, depth=trace_depth)
+        log(verbose, "🧪 Inventory (🟩 Empty | 🟥 Filled | 🟦 Excluded)", trace, depth=trace_depth)
         # OSRS inventory is 4 cols x 7 rows
         for r in range(7):
             row = icons[r * 4 : (r + 1) * 4]

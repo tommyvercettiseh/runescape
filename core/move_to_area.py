@@ -55,6 +55,26 @@ def _rand_in_box(x1, y1, x2, y2, pad):
     )
 
 
+def _screen_size():
+    import ctypes
+    return (
+        int(ctypes.windll.user32.GetSystemMetrics(0)),
+        int(ctypes.windll.user32.GetSystemMetrics(1)),
+    )
+
+
+def _clamp(v, lo, hi):
+    return max(lo, min(hi, v))
+
+
+def _safe_randint(a, b):
+    a = int(a)
+    b = int(b)
+    if a > b:
+        a, b = b, a
+    return random.randint(a, b)
+
+
 # ============================================================
 # MOVE TO AREA
 # ============================================================
@@ -123,18 +143,6 @@ def move_in_area(
     move_cursor((x, y), config=motion)
     return True
 
-def _screen_size():
-    # Windows: primary screen size
-    import ctypes
-    return (
-        int(ctypes.windll.user32.GetSystemMetrics(0)),
-        int(ctypes.windll.user32.GetSystemMetrics(1)),
-    )
-
-
-def _clamp(v, lo, hi):
-    return max(lo, min(hi, v))
-
 
 def move_outside_area(
     area_name,
@@ -167,28 +175,38 @@ def move_outside_area(
     right = x2 - pad - 1
     bottom = y2 - pad - 1
 
-    # scherm
+    # ✅ FIX: als padding de box "inverted"
+    if right < left:
+        left, right = x1, max(x1, x2 - 1)
+    if bottom < top:
+        top, bottom = y1, max(y1, y2 - 1)
+
     sw, sh = _screen_size()
     m = max(5, int(outside_margin))
 
-    # kies een zijde buiten de box
+    # clamp box naar scherm
+    L = _clamp(left, 0, sw - 1)
+    R = _clamp(right, 0, sw - 1)
+    T = _clamp(top, 0, sh - 1)
+    B = _clamp(bottom, 0, sh - 1)
+
     side = random.choice(("left", "right", "top", "bottom"))
 
     if side == "left":
-        x = random.randint(0, _clamp(left - m, 0, sw - 1))
-        y = random.randint(_clamp(top, 0, sh - 1), _clamp(bottom, 0, sh - 1))
+        x = _safe_randint(0, _clamp(L - m, 0, sw - 1))
+        y = _safe_randint(T, B)
 
     elif side == "right":
-        x = random.randint(_clamp(right + m, 0, sw - 1), sw - 1)
-        y = random.randint(_clamp(top, 0, sh - 1), _clamp(bottom, 0, sh - 1))
+        x = _safe_randint(_clamp(R + m, 0, sw - 1), sw - 1)
+        y = _safe_randint(T, B)
 
     elif side == "top":
-        x = random.randint(_clamp(left, 0, sw - 1), _clamp(right, 0, sw - 1))
-        y = random.randint(0, _clamp(top - m, 0, sh - 1))
+        x = _safe_randint(L, R)
+        y = _safe_randint(0, _clamp(T - m, 0, sh - 1))
 
     else:  # bottom
-        x = random.randint(_clamp(left, 0, sw - 1), _clamp(right, 0, sw - 1))
-        y = random.randint(_clamp(bottom + m, 0, sh - 1), sh - 1)
+        x = _safe_randint(L, R)
+        y = _safe_randint(_clamp(B + m, 0, sh - 1), sh - 1)
 
     dur = max(0.14, float(duration) * random.uniform(1 - jitter, 1 + jitter))
     if random.random() < 0.28:

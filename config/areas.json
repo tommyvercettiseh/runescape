@@ -145,10 +145,10 @@
   },
   "Fishing": {
     "coords": [
-      757,
-      293,
-      820,
-      326
+      755,
+      294,
+      818,
+      327
     ],
     "group": "Skilling"
   },
@@ -457,5 +457,41 @@
       482
     ],
     "group": "Inventory_Slots"
+  },
+  "NieuwGebied_3": {
+    "coords": [
+      631,
+      234,
+      693,
+      264
+    ],
+    "group": "default"
+  },
+  "Attack": {
+    "coords": [
+      627,
+      232,
+      690,
+      265
+    ],
+    "group": "Skilling"
+  },
+  "Crafting": {
+    "coords": [
+      692,
+      351,
+      755,
+      384
+    ],
+    "group": "Skilling"
+  },
+  "Smithing": {
+    "coords": [
+      755,
+      263,
+      818,
+      296
+    ],
+    "group": "Skilling"
   }
 }

@@ -58,6 +58,7 @@ from core.helpers.assist_deposit import deposit_inventory
 from core.helpers.assist_close_screen import assist_close_screen
 from core.helpers.assist_target import assist_target
 from ai_keyboard import press_key
+from core.helpers.assist_click_compass import assist_click_compass
 
 # ============================================================
 # SETTINGS
@@ -107,6 +108,7 @@ def main():
 # LET'S COOK!
 # ============================================================
     if not assist_click_target(kleur="paars", area="Bot_Area", bot_id=BOT_ID, min_size=200, verbose=VERBOSE):
+        assist_click_compass("west", bot_id=1, verbose=True)
         click_image("Icon_Fishing.png", "Info_Area", BOT_ID)
         return
     sleep_custom(2.1, 3.2)

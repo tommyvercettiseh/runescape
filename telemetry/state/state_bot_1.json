@@ -2,12 +2,12 @@
   "active": false,
   "ui_status": "done",
   "last_rc": 0,
-  "ended_at": 1769605589.6546633,
+  "ended_at": 1769859142.3482318,
   "bot_id": 1,
-  "updated_at": "2026-01-28T13:06:29.667746Z",
-  "script": "fishing.py",
-  "script_path": "C:\\Users\\Hesse\\Desktop\\Runescape\\scripts\\fishing.py",
-  "started_at": 1769605588.8378205,
+  "updated_at": "2026-01-31T11:32:22.361611Z",
+  "script": "combat.py",
+  "script_path": "C:\\Users\\Hesse\\Desktop\\Runescape\\scripts\\combat.py",
+  "started_at": 1769859126.5103238,
   "status": "fail",
   "runtime_s": 6
 }

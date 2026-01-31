@@ -15,7 +15,7 @@ from core.paths import IMAGES_DIR
 from core.move_to_area import move_outside_area
 
 # =========================
-# AREAS
+# AREAS 📍
 # =========================
 TOP = "Buttons_Top"
 BOTTOM = "Buttons_Bottom"
@@ -23,11 +23,11 @@ CONFIRM_AREA = "Tab_Confirmation_Area"
 MOVE_OUT_AREA = "Info_Area"
 
 # =========================
-# TABS PRESETS (alleen dit onderhouden)
+# TABS PRESETS 🧭
 # =========================
 TABS = {
     "fight":     {"emoji": "⚔️", "target_area": TOP},
-    "skilling":    {"emoji": "📚", "target_area": TOP},
+    "skilling":  {"emoji": "📚", "target_area": TOP},
     "inventory": {"emoji": "🎒", "target_area": TOP},
     "equipment": {"emoji": "🧰", "target_area": TOP},
     "prayer":    {"emoji": "🙏", "target_area": TOP},
@@ -40,7 +40,7 @@ TABS = {
 }
 
 # =========================
-# IMAGE HELPERS
+# IMAGE HELPERS 🖼️
 # =========================
 def _find_image(name: str) -> str | None:
     want = name.lower()
@@ -50,7 +50,8 @@ def _find_image(name: str) -> str | None:
     return None
 
 def _label(key: str) -> str:
-    return key[:1].upper() + key[1:].lower()
+    s = str(key).strip()
+    return s[:1].upper() + s[1:].lower()
 
 def _target_filename(key: str) -> str:
     return f"Tab_{_label(key)}.png"
@@ -59,7 +60,7 @@ def _confirm_filename(key: str) -> str:
     return f"Tab_{_label(key)}_Confirm.png"
 
 # =========================
-# ASSIST CLICK TAB
+# ASSIST CLICK TAB 🧭
 # =========================
 def assist_click_tab(tab, bot_id=1, verbose=True, timeout=3.0):
     key = str(tab).strip().lower()
@@ -67,8 +68,8 @@ def assist_click_tab(tab, bot_id=1, verbose=True, timeout=3.0):
 
     if not cfg:
         if verbose:
-            print(f"❌ Onbekende tab: {tab}")
-            print(f"✅ Beschikbaar: {', '.join(TABS.keys())}")
+            print(f"❌  🧭  Onbekende tab        | {tab}")
+            print(f"✅  🧭  Beschikbaar          | {', '.join(sorted(TABS.keys()))}")
         return False
 
     emo = cfg["emoji"]
@@ -76,44 +77,43 @@ def assist_click_tab(tab, bot_id=1, verbose=True, timeout=3.0):
     target_area = cfg["target_area"]
 
     # =========================
-    # 0) Confirm check (is al open?)
+    # 0) Confirm check ✅ (al open?)
     # =========================
-    confirm_img = _find_image(_confirm_filename(key))
+    confirm_name = _confirm_filename(key)
+    confirm_img = _find_image(confirm_name)
     if not confirm_img:
-        if verbose:
-            print(f"❌ Image mist: {_confirm_filename(key)}")
+        verbose and print(f"❌  🖼️  Mist image           | {confirm_name}")
         return False
 
     if detect_image(confirm_img, CONFIRM_AREA, bot_id, verbose=False):
-        if verbose:
-            print(f"{emo} {label} is al open ✅")
+        verbose and print(f"✅  {emo}  Tab al open        | {label}")
         return True
 
     # =========================
-    # 1) Click target
+    # 1) Click target 🎯
     # =========================
-    target_img = _find_image(_target_filename(key))
+    target_name = _target_filename(key)
+    target_img = _find_image(target_name)
     if not target_img:
-        if verbose:
-            print(f"❌ Image mist: {_target_filename(key)}")
+        verbose and print(f"❌  🖼️  Mist image           | {target_name}")
         return False
 
-    if verbose:
-        print(f"{emo} {label} openen…")
+    verbose and print(f"⏳  {emo}  Tab openen          | {label}")
 
     clicked = click_image(target_img, target_area, bot_id, verbose=False)
     if not clicked:
-        if verbose:
-            print(f"{emo} {label} target niet gevonden ❌")
+        verbose and print(f"❌  {emo}  Target niet gevonden | {label}")
         return False
 
+    verbose and print(f"✅  {emo}  Click gedaan         | {label}")
+
     # =========================
-    # 2) Move outside (ALLEEN na succesvolle click)
+    # 2) Move outside 🧭 (alleen na click)
     # =========================
     move_outside_area(MOVE_OUT_AREA, bot_id=bot_id)
 
     # =========================
-    # 3) Wait confirm
+    # 3) Wait confirm ⏳
     # =========================
     end = time.time() + float(timeout)
     checks = 0
@@ -121,21 +121,24 @@ def assist_click_tab(tab, bot_id=1, verbose=True, timeout=3.0):
     while time.time() < end:
         checks += 1
         if detect_image(confirm_img, CONFIRM_AREA, bot_id, verbose=False):
-            if verbose:
-                print(f"{emo} {label} bevestigd ✅ ({checks})")
+            verbose and print(f"✅  {emo}  Bevestigd           | {label}   ({checks})")
             return True
         sleep_custom(0.12, 0.28)
 
-    if verbose:
-        print(f"{emo} {label} geen confirmation ⚠️")
+    verbose and print(f"⚠️  {emo}  Geen confirmation    | {label}")
     return False
 
 # =========================
-# TEST
+# TEST 🧪
 # =========================
 if __name__ == "__main__":
     BOT = 1
-    print("🧪 Test tabs")
+    print("🧪  Test tabs\n")
+
+    assist_click_tab("Inventory", bot_id=1, verbose=True, timeout=3.0)
+
     for name in TABS.keys():
-        print("\n---", name, "---")
+        label = _label(name)
+        print(f"🧭  Test tab   | {label}")
         assist_click_tab(name, bot_id=BOT, verbose=True)
+        print()

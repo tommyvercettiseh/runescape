@@ -83,7 +83,8 @@
   "Close_Screen_X.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 70.0,
+    "area": "Bot_Area"
   },
   "Banking_Bank_Booth.png": {
     "method": "ALL",
@@ -130,12 +131,6 @@
     "min_shape": 95.0,
     "min_color": 90.0,
     "area": "Buttons_Top"
-  },
-  "Tab_Prayer_Confirm.png": {
-    "method": "TM_CCOEFF",
-    "min_shape": 85.0,
-    "min_color": 60.0,
-    "area": "Tab_Confirmation_Area"
   },
   "Tab_Spellbook.png": {
     "method": "TM_CCOEFF",
@@ -317,10 +312,10 @@
     "area": "Tab_Confirmation_Area"
   },
   "Tab_Chat_Game_On.png": {
-    "method": "ALL",
+    "method": "TM_CCOEFF_NORMED",
     "min_shape": 90.0,
     "min_color": 90.0,
-    "area": "Chat_Area"
+    "area": "Chat_Buttons"
   },
   "Tab_Skilling.png": {
     "method": "TM_CCOEFF",
@@ -489,5 +484,65 @@
     "min_shape": 90.0,
     "min_color": 90.0,
     "area": "Bot_Area_Full"
+  },
+  "Compass_East.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Bot_Area_Full"
+  },
+  "Compass_South.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Bot_Area_Full"
+  },
+  "Compass_West.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Bot_Area_Full"
+  },
+  "Tab_Prayer_Confirm.png": {
+    "method": "TM_SQDIFF",
+    "min_shape": 95.0,
+    "min_color": 90.0,
+    "area": "Tab_Confirmation_Area"
+  },
+  "Tab_Chat_Game_Off.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Chat_Buttons"
+  },
+  "Item_Gold_Bar.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0,
+    "area": "Inventory_Area"
+  },
+  "Continue_Gold_Ring.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 85.0,
+    "area": "Bot_Area"
+  },
+  "Item_Necklace_Mould.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Continue_Gold_Necklace.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 75.0,
+    "area": "Bot_Area"
+  },
+  "Item_Ring_Mould.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
   }
 }

@@ -1,69 +1,79 @@
 from __future__ import annotations
 
-"""Project-wide autoload.
+import importlib
+import os
+from pathlib import Path
 
-Doel:
-  1 import en je hebt assist_*, state functies en vision helpers direct beschikbaar.
-
-Gebruik in scripts (na je bootstrap):
-
-    from core.autoload import autoload
-    autoload(globals())
-
-Daarna kun je gewoon:
-    assist_login(...)
-    detect_image(...)
-    should_play(...)
-"""
-
-from core.main_loader import LoadSpec, load_exports
-
+from core.main_loader import LoadSpec, load_exports  # :contentReference[oaicite:2]{index=2}
 
 _CACHE: dict[str, object] | None = None
+_CACHE_KEY: tuple | None = None
+
+# Optioneel: alias mapping blijft handig
+ALIASES: dict[str, tuple[str, ...]] = {
+    "assist_click_exclude": ("assist_click_exclude", "assist_exclude_bot", "assist_click_exclude_bot"),
+}
 
 
-def _build_exports(*, verbose=False):
-    exports: dict[str, object] = {}
+def _apply_aliases(exports: dict[str, object], *, verbose=False) -> None:
+    for alias, candidates in ALIASES.items():
+        if alias in exports:
+            continue
+        for name in candidates:
+            if name in exports:
+                exports[alias] = exports[name]
+                if verbose:
+                    print(f"🔁 autoload alias: {alias} → {name}")
+                break
 
-    # =========================
-    # AUTO EXPORT SPECS
-    # =========================
+
+def _pkg_fingerprint(packages: list[str]) -> tuple:
+    """
+    Bouw een key op basis van:
+    • alle module-bestanden die in de packages zitten
+    • hun mtime (laatste wijziging)
+    Hierdoor refresht autoload automatisch als jij iets toevoegt of wijzigt.
+    """
+    parts: list[tuple[str, float]] = []
+
+    for pkg in packages:
+        try:
+            mod = importlib.import_module(pkg)
+        except Exception:
+            continue
+
+        pkg_paths = getattr(mod, "__path__", None)
+        if not pkg_paths:
+            continue
+
+        for p in pkg_paths:
+            base = Path(p)
+            if not base.exists():
+                continue
+
+            # scan .py files (1 level diep is genoeg voor jouw structuur)
+            for f in base.rglob("*.py"):
+                try:
+                    parts.append((str(f), f.stat().st_mtime))
+                except Exception:
+                    pass
+
+    parts.sort()
+    return tuple(parts)
+
+
+def _build_exports(*, verbose=False) -> dict[str, object]:
+    # 👇 dit is de echte power move: core.helpers zonder assist_ filters
     specs = [
-        # ✅ STATES: laadt automatisch alles uit states/*.py
-        LoadSpec(
-            package="states",
-            public_only=True,
-            export_constants=False,
-        ),
+        LoadSpec(package="states", public_only=True, export_constants=False),
 
-        # ✅ Helpers: assist_* modules + assist_* functies
         LoadSpec(
             package="core.helpers",
-            module_prefix="assist_",
-            name_prefix="assist_",
             public_only=True,
             export_constants=False,
-            exclude_modules={
-                "assist_testing",
-            },
+            exclude_modules={"assist_testing"},
         ),
 
-        # ✅ Helpers: functies die NIET met assist_ beginnen (maar wel in assist_* modules zitten)
-        # Voorbeeld: inventory_full (in assist_inventory_full.py)
-        LoadSpec(
-            package="core.helpers",
-            module_prefix="assist_",
-            only_names={
-                "inventory_full",
-            },
-            public_only=True,
-            export_constants=False,
-            exclude_modules={
-                "assist_testing",
-            },
-        ),
-
-        # ✅ Vision: alleen de API die jij wil
         LoadSpec(
             package="vision",
             public_only=True,
@@ -81,19 +91,13 @@ def _build_exports(*, verbose=False):
             },
         ),
 
-        # ✅ Helpers (algemene project helpers)
         LoadSpec(
             package="helpers",
-            only_names={
-                "sleep_custom",
-                "random_sleep",
-                "random_sleep_range",
-            },
+            only_names={"sleep_custom", "random_sleep", "random_sleep_range"},
             public_only=True,
             export_constants=False,
         ),
 
-        # ✅ Core: veelgebruikte tools (whitelist om conflicts te voorkomen)
         LoadSpec(
             package="core",
             only_names={
@@ -103,50 +107,53 @@ def _build_exports(*, verbose=False):
                 "move_and_click",
                 "get_offset",
                 "apply_offset",
-                "drop_inventory",  # ✅ vaak nodig
+                "drop_inventory",
             },
             public_only=True,
             export_constants=False,
-            exclude_modules={
-                "api",
-                "autoload",
-                "main_loader",
-                "bootstrap",
-            },
+            exclude_modules={"api", "autoload", "main_loader", "bootstrap"},
         ),
     ]
 
-    loaded, _origins = load_exports(specs, verbose=verbose, fail_on_dupes=True)
-    exports.update(loaded)
+    loaded, _origins = load_exports(specs, verbose=verbose, fail_on_dupes=True, skip_import_errors=True)
+    exports = dict(loaded)
 
-    # =========================================================
-    # ROOT MODULES (losse .py in project root, bv ai_keyboard.py)
-    # =========================================================
-    try:
-        import importlib
+    _apply_aliases(exports, verbose=verbose)
 
-        kb = importlib.import_module("ai_keyboard")  # ai_keyboard.py in ROOT
-        if hasattr(kb, "press_key"):
-            exports["press_key"] = kb.press_key
-    except Exception:
-        pass
+    if verbose:
+        # checkjes die jij tof vindt 😄
+        for name in ("assist_click_exclude", "assist_exclude_bot", "assist_click_exclude_bot"):
+            print(f"🧠 autoload check: {name} {'✅' if name in exports else '❌'}")
+        print(f"🧠 autoload check: game_on_button {'✅' if 'game_on_button' in exports else '❌'}")
 
     return exports
 
 
 def get_exports(*, verbose=False) -> dict[str, object]:
-    global _CACHE
-    if _CACHE is None:
+    global _CACHE, _CACHE_KEY
+
+    # packages waar jij vaak “nieuwe dingen” toevoegt
+    key = _pkg_fingerprint(["core.helpers", "states", "helpers", "core", "vision"])
+
+    if _CACHE is None or _CACHE_KEY != key:
+        _CACHE_KEY = key
         _CACHE = _build_exports(verbose=verbose)
+
+        if verbose:
+            print("♻️ autoload: refreshed (changes detected)")
+
     return _CACHE
 
 
-def autoload(namespace: dict, *, verbose=False) -> dict[str, object]:
-    """Injecteert alle exports in jouw script namespace.
+def autoload(namespace: dict, *, verbose=False, force_reload=False) -> dict[str, object]:
+    global _CACHE, _CACHE_KEY
 
-    Tip:
-      autoload(globals())
-    """
+    if force_reload:
+        _CACHE = None
+        _CACHE_KEY = None
+        if verbose:
+            print("♻️ autoload: force reload")
+
     exports = get_exports(verbose=verbose)
     namespace.update(exports)
     return exports

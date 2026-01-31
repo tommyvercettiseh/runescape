@@ -92,6 +92,7 @@ def save_template_metadata(template_name, settings_dict):
     _safe_write_json(DEBUG_META_FILE, meta_dbg)
 
 
+
 def delete_template_metadata(template_name):
     meta_main = _safe_read_json(META_FILE)
     if template_name in meta_main:

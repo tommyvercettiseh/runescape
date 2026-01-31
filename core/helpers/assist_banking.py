@@ -14,14 +14,15 @@ from core.click_image import click_image
 from vision.image_detection import detect_image
 from helpers.random_sleep import random_sleep
 from core.helpers.assist_target import assist_target
+
 # ============================================================
-# ASSIST BANKING
+# ASSIST BANKING 🏦
 # ============================================================
 def assist_banking(
     bot_id=1,
     verbose=True,
     timeout_s=10,
-    poll_interval_s=2,
+    poll_interval_s=0.1,
     attempts=2,
 ):
     BANK_OPEN_IMG = "Bank_Deposit.png"
@@ -30,7 +31,7 @@ def assist_banking(
     # 🔍 Bank al open?
     if detect_image(BANK_OPEN_IMG, AREA, bot_id, verbose=False):
         if verbose:
-            print("✅ 🏦 Bank is al open ")
+            print("✅  🏦  Bank is al open")
         return True
 
     # ⏳ Wachten tot bank open (max timeout_s)
@@ -44,9 +45,8 @@ def assist_banking(
 
             check_i += 1
             if verbose:
-                print(f"⏳ Wachten ({check_i})")
+                print(f"⏳  🏦  Wachten op bank   ({check_i})")
 
-            random_sleep()
             time.sleep(poll_interval_s)
 
         return False
@@ -54,32 +54,39 @@ def assist_banking(
     # 🔁 Pogingen
     for attempt in range(attempts):
         if verbose:
-            print(f"🏦 Bank openen, poging {attempt + 1}/{attempts}")
-            assist_target(kleur="cyaan", area="Bot_Area", bot_id=1, min_size=100, max_passes=2, verbose=True)
+            print(f"🔁  🏦  Bank openen   | poging {attempt + 1}/{attempts}")
+
+        assist_target(
+            kleur="cyaan",
+            area="Bot_Area",
+            bot_id=bot_id,
+            min_size=100,
+            max_passes=1,
+            verbose=False,
+        )
 
         # ✅ Check resultaat
         if wait_for_bank_open():
             if verbose:
-                print("🏦 Bank open ✅")
+                print("✅  🏦  Bank succesvol geopend")
             return True
 
         if verbose:
-            print("🔁 Timeout, retry")
+            print("⏳  🏦  Geen bank gevonden   → retry")
 
     if verbose:
-        print("❌ Bank openen mislukt")
+        print("❌  🏦  Bank openen mislukt")
+
     return False
 
 
 # ============================================================
-# MAIN TEST
+# MAIN TEST 🧪
 # ============================================================
-
 if __name__ == "__main__":
     BOT_ID = 1
-    print("🧪 Test assist_banking")
+    print("🧪  Test assist_banking\n")
 
-    # voorbeeld: max 6 seconden wachten
     result = assist_banking(bot_id=BOT_ID, timeout_s=6)
 
-    print("RESULT:", result)
+    print("\n📊  RESULTAAT:", "✅  SUCCES" if result else "❌  GEFAALD")

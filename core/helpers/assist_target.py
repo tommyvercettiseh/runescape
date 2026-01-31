@@ -5,14 +5,14 @@ import os
 from pathlib import Path
 
 # ============================================================
-# BOOTSTRAP
+# BOOTSTRAP 🚀
 # ============================================================
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 # ============================================================
-# IMPORTS
+# IMPORTS 📥
 # ============================================================
 from core.helpers.assist_click_target import assist_click_target
 from core.helpers.assist_find_target import assist_find_target
@@ -22,7 +22,7 @@ def assist_target(
     *,
     kleur="paars",
     area="Bot_Area",
-    bot_id=None,            # ✅ safer default
+    bot_id=None,            # safer default
     min_size=100,
 
     do_click=True,
@@ -46,13 +46,13 @@ def assist_target(
     **_legacy,
 ):
     # ========================================================
-    # RESOLVE BOT_ID
+    # RESOLVE BOT_ID 🧠
     # ========================================================
     if bot_id is None:
         bot_id = int(os.getenv("BOT_ID", "1"))
 
     # ========================================================
-    # ALIASES
+    # ALIASES 🔁
     # ========================================================
     if "colour" in _legacy and kleur == "paars":
         kleur = _legacy["colour"]
@@ -67,11 +67,12 @@ def assist_target(
 
     kleur_txt = str(kleur).capitalize()
 
-    if verbose:
-        print(f"🎯 Assist Target | Bot = {bot_id} | Colour = {kleur_txt} | Area = {area} | Min Size = {min_size}")
+    verbose and print(
+        f"⏳  🎯  Assist target starten   | Bot {bot_id} | {kleur_txt} | {area} | min {min_size}"
+    )
 
     # ========================================================
-    # FIND
+    # FIND 🔍
     # ========================================================
     info = assist_find_target(
         kleur=kleur,
@@ -87,20 +88,17 @@ def assist_target(
     )
 
     if not info.get("found"):
-        if verbose:
-            print("❌ Target Not Found")
+        verbose and print("❌  🎯  Target niet gevonden")
         return {"ok": False, "stage": "find", "info": info, "bot_id": bot_id}
 
     if not do_click:
-        if verbose:
-            print("✅ Target Found | Click Skipped")
+        verbose and print("✅  🎯  Target gevonden      | click overgeslagen")
         return {"ok": True, "stage": "found_only", "info": info, "bot_id": bot_id}
 
     # ========================================================
-    # CLICK
+    # CLICK 🖱️
     # ========================================================
-    if verbose:
-        print("🖱️ Click Target")
+    verbose and print("⏳  🖱️  Target aanklikken")
 
     ok = assist_click_target(
         kleur=kleur,
@@ -119,20 +117,26 @@ def assist_target(
     )
 
     if not ok:
-        if verbose:
-            print("❌ Click Failed")
+        verbose and print("❌  🖱️  Click mislukt")
         return {"ok": False, "stage": "click", "info": info, "bot_id": bot_id}
 
-    if verbose:
-        print("✅ Target Clicked")
+    verbose and print("✅  🎯  Target aangeklikt")
 
     return {"ok": True, "stage": "clicked", "info": info, "bot_id": bot_id}
 
 
 # ============================================================
-# TEST
+# TEST 🧪
 # ============================================================
 if __name__ == "__main__":
-    # gebruikt BOT_ID env als die bestaat, anders 1
-    res = assist_target(kleur="cyaan", area="Bot_Area", bot_id=None, min_size=50, max_passes=1, verbose=True)
-    print("RESULT:", res)
+    res = assist_target(
+        kleur="cyaan",
+        area="Bot_Area",
+        bot_id=None,
+        min_size=100,
+        max_passes=2,
+        verbose=True,
+    )
+
+    print("\n📊  RESULTAAT:", "✅  SUCCES" if res["ok"] else "❌  GEFAALD")
+    print(res)

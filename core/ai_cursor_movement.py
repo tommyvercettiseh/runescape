@@ -1,11 +1,28 @@
 ﻿from __future__ import annotations
 
+# ============================================================
+# BOOTSTRAP
+# ============================================================
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]  # .../Runescape
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+# ============================================================
+# IMPORTS
+# ============================================================
 import time
 import random
 import math
 import ctypes
+import importlib
 from dataclasses import dataclass
 from typing import Tuple, List
+
+from config.areas import load_coords
+from core.bot_offsets import apply_offset
 
 Point = Tuple[int, int]
 Bounds = Tuple[int, int, int, int]
@@ -63,12 +80,6 @@ def _clamp(v: float, lo: float, hi: float) -> float:
 
 
 def _scale_sleep(sleep_s: float, speed_pct: float) -> float:
-    """
-    speed_pct:
-      100 = identiek aan oud gedrag
-      150 = 1.5x sneller (sleep kleiner)
-      50  = 2x langzamer (sleep groter)
-    """
     try:
         sp = float(speed_pct)
     except Exception:
@@ -142,10 +153,6 @@ def plan_move(
     bounds: Bounds | None = None,
     speed_pct: float = 100.0,
 ) -> List[PlannedStep]:
-    """
-    Planner: maakt een lijst (x,y,sleep) stappen.
-    Geen echte muis acties hier.
-    """
     if bounds is None:
         bounds = get_default_bounds()
 
@@ -237,49 +244,58 @@ def plan_move(
 
 
 # ============================================================
-# RANDOM MOUSE MOVEMENT (AREA-BASED)
+# RANDOM MOUSE MOVEMENT (AREA BASED, NO TELEPORT START)
 # ============================================================
-def random_mouse(
+def random_mouse_movements(
     min_sec,
     max_sec,
-    area,
+    area_name,
     *,
     bot_id=1,
-    pack=None,
     padding=6,
     verbose=False,
-    speed_pct=100.0,
+
+    # ✅ feel settings
+    fps=120,                 # fps blijft altijd hetzelfde
+    speed_min=65.0,          # % speed range (lager = trager)
+    speed_max=165.0,         # % speed range (hoger = sneller)
+    slow_chance=0.22,        # kans op "langzaam moment"
+    slow_mult=0.55,          # maakt speed tijdelijk lager
+    fast_chance=0.18,        # kans op "sneller moment"
+    fast_mult=1.35,          # maakt speed tijdelijk hoger
+
+    # ✅ segment timing (wordt nog dynamisch gecorrigeerd)
+    seg_min=0.12,
+    seg_max=0.70,
+
+    # ✅ pause feel (micro pauses)
+    pause_min=0.01,
+    pause_max=0.08,
+
+    enter_first=True,
 ) -> bool:
     """
-    Random mouse movement binnen een area (met bot offset) voor min_sec..max_sec seconden.
-
-    Aanroep:
-      random_mouse_movement(1, 4, "Bot Area", verbose=VERBOSE, bot_id=1)
+    Random mouse movement binnen area voor min_sec..max_sec seconden.
+    Dynamischer: speed varieert per segment, fps blijft constant, blijft smooth.
     """
 
-    from core.bot_offsets import load_areas, apply_offset
-    import importlib
-
-    # circular-import safe
     ai = importlib.import_module("core.ai_cursor")
     move_cursor = ai.move_cursor
 
-    areas = load_areas(pack)
-
-    key = str(area).lower()
-    area_map = {k.lower(): k for k in areas}
-    if key not in area_map:
+    try:
+        coords = list(load_coords(area_name))
+    except Exception:
         if verbose:
-            print(f"❌ random_mouse_movement: area '{area}' niet gevonden")
+            print(f"❌ random_mouse_movement: area '{area_name}' niet gevonden via load_coords()")
         return False
 
-    name = area_map[key]
-    x1, y1, x2, y2 = apply_offset(areas[name], int(bot_id))
+    x1, y1, x2, y2 = apply_offset(coords, int(bot_id))
 
-    left = int(x1 + padding)
-    top = int(y1 + padding)
-    right = int(x2 - padding - 1)
-    bottom = int(y2 - padding - 1)
+    pad = max(0, int(padding))
+    left = int(x1 + pad)
+    top = int(y1 + pad)
+    right = int(x2 - pad - 1)
+    bottom = int(y2 - pad - 1)
 
     if right <= left or bottom <= top:
         if verbose:
@@ -288,31 +304,109 @@ def random_mouse(
 
     bounds = (left, top, right + 1, bottom + 1)
 
-    total_time = random.uniform(float(min_sec), float(max_sec))
-    deadline = time.time() + total_time
+    total = random.uniform(float(min_sec), float(max_sec))
+    end_t = time.time() + total
 
     if verbose:
-        print(f"🌀 Random mouse movement '{name}' bot={bot_id} ~{total_time:.2f}s")
+        print(f"🌀 Random mouse movement '{area_name}' bot={bot_id} ~{total:.2f}s fps={fps}")
 
+    # ------------------------------------------------------------
+    # helpers: dynamische speed & segment durations (smooth)
+    # ------------------------------------------------------------
+    def _pick_speed():
+        sp = random.uniform(float(speed_min), float(speed_max))
+
+        r = random.random()
+        if r < float(slow_chance):
+            sp *= float(slow_mult)
+        elif r > 1.0 - float(fast_chance):
+            sp *= float(fast_mult)
+
+        # cap safe
+        return max(20.0, min(sp, 240.0))
+
+    def _seg_duration(speed_pct):
+        """
+        Sneller = kortere duration.
+        Trager = langere duration.
+        """
+        base = random.uniform(float(seg_min), float(seg_max))
+
+        # speed influence (100% ~ neutraal)
+        if speed_pct >= 100:
+            base *= random.uniform(0.65, 0.95)
+        else:
+            base *= random.uniform(1.05, 1.55)
+
+        # af en toe een "slow sweep"
+        if random.random() < 0.14:
+            base *= random.uniform(1.15, 1.90)
+
+        return max(0.10, min(base, 1.25))
+
+    # ------------------------------------------------------------
+    # enter area first (voorkomt teleport clamp-start)
+    # ------------------------------------------------------------
+    if enter_first:
+        entry_x = random.randint(left, right)
+        entry_y = random.randint(top, bottom)
+
+        entry_speed = _pick_speed()
+        entry_dur = max(0.35, _seg_duration(entry_speed))
+
+        entry_motion = CursorMotionConfig(duration=float(entry_dur), fps=int(fps))
+
+        move_cursor(
+            (entry_x, entry_y),
+            config=entry_motion,
+            bounds=None,  # 🔥 belangrijk
+            speed_pct=float(entry_speed),
+        )
+
+    # ------------------------------------------------------------
+    # main wander loop
+    # ------------------------------------------------------------
     moves = 0
-    while time.time() < deadline:
+    while time.time() < end_t:
+        remaining = end_t - time.time()
+        if remaining <= 0:
+            break
+
         tx = random.randint(left, right)
         ty = random.randint(top, bottom)
 
-        seg_time = random.uniform(0.12, 0.45)
-        motion = CursorMotionConfig(duration=float(seg_time))
+        sp = _pick_speed()
+        dur = _seg_duration(sp)
+
+        # niet te lang als we bijna klaar zijn
+        if remaining < 0.25:
+            dur = min(dur, remaining)
+
+        motion = CursorMotionConfig(duration=float(dur), fps=int(fps))
 
         move_cursor(
             (tx, ty),
             config=motion,
             bounds=bounds,
-            speed_pct=float(speed_pct),
+            speed_pct=float(sp),
         )
 
         moves += 1
-        time.sleep(random.uniform(0.02, 0.10))
+
+        # micro pause (niet altijd, anders voelt het "scripted")
+        if pause_max > 0:
+            if random.random() < 0.85:
+                time.sleep(random.uniform(float(pause_min), float(pause_max)))
 
     if verbose:
         print(f"✅ random_mouse_movement done ({moves} moves)")
 
     return True
+
+# ============================================================
+# SELF TEST
+# ============================================================
+if __name__ == "__main__":
+    VERBOSE = True
+    ok = random_mouse_movement(1, 4, "Bot_Area_Full", bot_id=1, verbose=VERBOSE)
+    print(f"🧪 Test klaar | success={ok}")

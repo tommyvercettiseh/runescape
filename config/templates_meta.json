@@ -77,7 +77,7 @@
   "Close_Screen_X.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 70.0
   },
   "Banking_Bank_Booth.png": {
     "method": "ALL",
@@ -118,11 +118,6 @@
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
     "min_color": 90.0
-  },
-  "Tab_Prayer_Confirm.png": {
-    "method": "TM_CCOEFF",
-    "min_shape": 85.0,
-    "min_color": 60.0
   },
   "Tab_Spellbook.png": {
     "method": "TM_CCOEFF",
@@ -275,7 +270,7 @@
     "min_color": 90.0
   },
   "Tab_Chat_Game_On.png": {
-    "method": "ALL",
+    "method": "TM_CCOEFF_NORMED",
     "min_shape": 90.0,
     "min_color": 90.0
   },
@@ -422,6 +417,56 @@
   "Login_Screen_Update.png": {
     "method": "TM_CCOEFF",
     "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Compass_East.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Compass_South.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Compass_West.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Tab_Prayer_Confirm.png": {
+    "method": "TM_SQDIFF",
+    "min_shape": 95.0,
+    "min_color": 90.0
+  },
+  "Tab_Chat_Game_Off.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Item_Gold_Bar.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0
+  },
+  "Continue_Gold_Ring.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 85.0
+  },
+  "Item_Necklace_Mould.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0
+  },
+  "Continue_Gold_Necklace.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 75.0
+  },
+  "Item_Ring_Mould.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
     "min_color": 90.0
   }
 }
