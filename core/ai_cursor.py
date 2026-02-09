@@ -297,9 +297,6 @@ def _apply_tail_variation(
 
             x, y = clamp_point((int(round(x + dx)), int(round(y + dy))), bounds)
 
-            if mode == "slow":
-                s *= random.uniform(1.05, 1.25)
-
         new_steps.append(PlannedStep(x=x, y=y, sleep_s=s))
 
     # force exact end at target
@@ -358,8 +355,12 @@ def move_cursor(
     else:
         steps = plan_move(start, target, config=config, bounds=bounds, speed_pct=speed_pct)
 
+    last_xy = start
     for st in steps:
-        ex.move_abs(st.x, st.y)
+        xy = (st.x, st.y)
+        if xy != last_xy:
+            ex.move_abs(st.x, st.y)
+            last_xy = xy
         if st.sleep_s:
             time.sleep(st.sleep_s)
 
@@ -603,10 +604,13 @@ def move_and_click(
         final_settle=final_settle,
     )
     steps = _apply_tail_variation(steps, target, bounds, mode=tail_mode)
-    steps = _compress_steps(steps)
 
+    last_xy = start
     for st in steps:
-        ex.move_abs(st.x, st.y)
+        xy = (st.x, st.y)
+        if xy != last_xy:
+            ex.move_abs(st.x, st.y)
+            last_xy = xy
         if st.sleep_s:
             time.sleep(st.sleep_s)
 

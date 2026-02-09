@@ -1,0 +1,659 @@
+{
+  "date": "2026-02-09",
+  "bot_id": 1,
+  "budget_sec": 28800.0,
+  "used_sec": 116.230851,
+  "fatigue": 0.004035793451498349,
+  "battery": 0.9959642065485016,
+  "updated_at": "2026-02-09T12:18:00",
+  "sessions": [
+    {
+      "start_ts": 1770635698.663481,
+      "end_ts": 1770635725.768843,
+      "sec": 27.105363,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 1304,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635725.947477,
+      "end_ts": 1770635729.17286,
+      "sec": 3.225383,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 18072,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635729.343087,
+      "end_ts": 1770635732.565365,
+      "sec": 3.222278,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 11000,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635732.739958,
+      "end_ts": 1770635733.617363,
+      "sec": 0.877405,
+      "reason": "stop_bot",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 5280,
+        "rc": 1
+      }
+    },
+    {
+      "start_ts": 1770635789.857118,
+      "end_ts": 1770635810.93885,
+      "sec": 21.081732,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 12652,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635811.163424,
+      "end_ts": 1770635811.986257,
+      "sec": 0.822833,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 12712,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635812.163336,
+      "end_ts": 1770635812.98181,
+      "sec": 0.818475,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 2132,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635813.154268,
+      "end_ts": 1770635813.973348,
+      "sec": 0.81908,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 6076,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635814.149463,
+      "end_ts": 1770635814.9683,
+      "sec": 0.818837,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 7256,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635815.146239,
+      "end_ts": 1770635815.96673,
+      "sec": 0.820491,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 3932,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635816.141157,
+      "end_ts": 1770635816.958866,
+      "sec": 0.817708,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 16704,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635817.137791,
+      "end_ts": 1770635817.956667,
+      "sec": 0.818876,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 12592,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635818.133476,
+      "end_ts": 1770635818.951189,
+      "sec": 0.817713,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 17296,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635819.12538,
+      "end_ts": 1770635819.943385,
+      "sec": 0.818005,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 14376,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635820.118287,
+      "end_ts": 1770635820.93839,
+      "sec": 0.820103,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 4160,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635821.110487,
+      "end_ts": 1770635821.929109,
+      "sec": 0.818623,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 11048,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635822.103791,
+      "end_ts": 1770635822.923411,
+      "sec": 0.819619,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 10724,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635823.099247,
+      "end_ts": 1770635823.918299,
+      "sec": 0.819053,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 18896,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635824.092281,
+      "end_ts": 1770635824.910482,
+      "sec": 0.818201,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 20624,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635825.087088,
+      "end_ts": 1770635825.905572,
+      "sec": 0.818485,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 11360,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635826.078746,
+      "end_ts": 1770635826.896986,
+      "sec": 0.81824,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 18032,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635827.070095,
+      "end_ts": 1770635827.888542,
+      "sec": 0.818447,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 2132,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635828.062071,
+      "end_ts": 1770635828.881131,
+      "sec": 0.81906,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 6076,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635829.054566,
+      "end_ts": 1770635830.07388,
+      "sec": 1.019314,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 16256,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635830.24792,
+      "end_ts": 1770635831.067036,
+      "sec": 0.819116,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 8196,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635831.239729,
+      "end_ts": 1770635832.058993,
+      "sec": 0.819263,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 3236,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635832.234776,
+      "end_ts": 1770635833.053252,
+      "sec": 0.818475,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 17984,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635833.227492,
+      "end_ts": 1770635834.047203,
+      "sec": 0.81971,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 17436,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635834.21995,
+      "end_ts": 1770635835.039601,
+      "sec": 0.81965,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 5888,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635835.213405,
+      "end_ts": 1770635836.032059,
+      "sec": 0.818654,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 8392,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635836.211198,
+      "end_ts": 1770635837.030436,
+      "sec": 0.819238,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 20536,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635837.207329,
+      "end_ts": 1770635838.025858,
+      "sec": 0.818529,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 9812,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635838.204047,
+      "end_ts": 1770635839.022506,
+      "sec": 0.818459,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 18796,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635839.194907,
+      "end_ts": 1770635840.015201,
+      "sec": 0.820293,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 18092,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635840.189868,
+      "end_ts": 1770635841.007707,
+      "sec": 0.817839,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 5020,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635841.182528,
+      "end_ts": 1770635842.001804,
+      "sec": 0.819276,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 8868,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635842.176238,
+      "end_ts": 1770635842.99737,
+      "sec": 0.821132,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 14924,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635843.176174,
+      "end_ts": 1770635843.997666,
+      "sec": 0.821492,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 3956,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635844.173468,
+      "end_ts": 1770635844.99224,
+      "sec": 0.818772,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 18992,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635845.1659,
+      "end_ts": 1770635845.985467,
+      "sec": 0.819567,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 20104,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635846.160394,
+      "end_ts": 1770635846.98082,
+      "sec": 0.820426,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 13160,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635847.158841,
+      "end_ts": 1770635847.976978,
+      "sec": 0.818136,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 16760,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635848.1497,
+      "end_ts": 1770635848.968595,
+      "sec": 0.818895,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 5080,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635849.144218,
+      "end_ts": 1770635849.963084,
+      "sec": 0.818865,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 18972,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635850.137542,
+      "end_ts": 1770635850.956403,
+      "sec": 0.818862,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 3140,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635851.129296,
+      "end_ts": 1770635851.948283,
+      "sec": 0.818987,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 17384,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635852.121731,
+      "end_ts": 1770635852.94005,
+      "sec": 0.818319,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 17736,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635853.114489,
+      "end_ts": 1770635853.934444,
+      "sec": 0.819955,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 6404,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635854.107385,
+      "end_ts": 1770635854.926307,
+      "sec": 0.818922,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 20608,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635855.100758,
+      "end_ts": 1770635855.920458,
+      "sec": 0.8197,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 4296,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635856.096355,
+      "end_ts": 1770635856.915002,
+      "sec": 0.818647,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 4056,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635857.0918,
+      "end_ts": 1770635858.11463,
+      "sec": 1.02283,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 18064,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635858.292005,
+      "end_ts": 1770635879.544059,
+      "sec": 21.252054,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 5056,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770635879.720148,
+      "end_ts": 1770635880.283613,
+      "sec": 0.563464,
+      "reason": "stop_bot",
+      "meta": {
+        "source": "bot_manager",
+        "script": "smithing.py",
+        "pid": 9520,
+        "rc": 1
+      }
+    }
+  ]
+}

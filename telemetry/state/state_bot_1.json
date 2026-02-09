@@ -1,13 +1,13 @@
 {
   "active": false,
-  "ui_status": "done",
-  "last_rc": 0,
-  "ended_at": 1770386106.350683,
+  "ui_status": "fail",
+  "last_rc": 1,
+  "ended_at": 1770635880.3255117,
   "bot_id": 1,
-  "updated_at": "2026-02-06T13:55:06.359794Z",
+  "updated_at": "2026-02-09T11:18:00.334440Z",
   "script": "smithing.py",
   "script_path": "C:\\Users\\Hesse\\Desktop\\Runescape\\scripts\\smithing.py",
-  "started_at": 1770386086.2796373,
+  "started_at": 1770635879.6984968,
   "status": "fail",
   "runtime_s": 6
 }

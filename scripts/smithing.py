@@ -111,6 +111,7 @@ def main():
     if assist_target(kleur="paars", area="Bot_Area", bot_id=BOT_ID, min_size=100, max_passes=2, verbose=VERBOSE):
         if detect_image(CONTINUE_IMAGE, "Bot_Area", bot_id=BOT_ID, verbose=VERBOSE, timeout=5, interval=0.5):
             if click_image(CONTINUE_IMAGE, "Bot_Area", bot_id=BOT_ID, verbose=VERBOSE):
+                sleep_custom(2.146, 2.215)
                 return
 
 

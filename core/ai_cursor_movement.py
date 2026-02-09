@@ -142,14 +142,13 @@ def _bezier2(p0: Point, p1: Tuple[float, float], p2: Point, t: float) -> Tuple[f
 
 def _pick_tick(cluster: float | None = None) -> float:
     """
-    Pick a tick near 1/144s with small drift.
-    Keep variation minimal to avoid visible jitter at high refresh.
+    Frame-locked tick near 1/144s.
+    For 144 Hz motion quality we keep dt stable; smoothness comes from trajectory,
+    not timing noise.
     """
     if cluster is None:
         cluster = TARGET_TICK
-    jitter = random.uniform(-0.0010, 0.0010)
-    v = cluster + jitter
-    return _clamp(v, TICK_MIN, TICK_MAX)
+    return _clamp(float(cluster), TICK_MIN, TICK_MAX)
 
 
 def _speed_for_dist(dist: float) -> float:
@@ -183,14 +182,14 @@ def plan_move(
         return [PlannedStep(x=x2, y=y2, sleep_s=0.0)]
     # micro moves: direct, no planner feel (smooth at 144 Hz)
     if dist < 8.0:
-        sleep_s = random.uniform(0.003, 0.010)
+        sleep_s = TARGET_TICK
         return [PlannedStep(x=x2, y=y2, sleep_s=_scale_sleep(sleep_s, speed_pct))]
 
     speed = _speed_for_dist(dist)
     duration = dist / speed
     duration = _clamp(duration, float(config.min_duration), float(MAX_DURATION_PER_MOVE))
 
-    tick = _pick_tick()
+    tick = _pick_tick(TARGET_TICK)
     steps = max(int(duration / tick), int(config.min_steps))
     steps = min(steps, int(MAX_DURATION_PER_MOVE / TICK_MIN))
 
@@ -220,14 +219,16 @@ def plan_move(
     fx, fy = float(x1), float(y1)
     planned: List[PlannedStep] = []
 
-    use_wave = dist > 60.0
-    # speed wave per move (prevents metronome timing) only for larger moves
-    wave_len = random.randint(8, 18) if use_wave else 1
-    wave_phase = random.uniform(0.0, math.tau) if use_wave else 0.0
-    wave_amp = random.uniform(0.02, 0.06) if use_wave else 0.0
-    cluster = TARGET_TICK if use_wave else None
+    # Fixed tick timing for smooth high-refresh rendering.
+    cluster = TARGET_TICK
+    base_sleep = _pick_tick(cluster)
 
-    last_xy: tuple[int, int] | None = None
+    # Subpixel accumulator to avoid "same pixel for N frames then jump" aliasing.
+    last_fx, last_fy = float(x1), float(y1)
+    ix, iy = int(x1), int(y1)
+    err_x = 0.0
+    err_y = 0.0
+
     for i in range(1, steps + 1):
         t = i / steps
         s = _ease_in_out_quad(t)
@@ -250,28 +251,30 @@ def plan_move(
         else:
             fx, fy = tx, ty
 
-        xi, yi = clamp_point((int(round(fx)), int(round(fy))), bounds)
-        wave = 1.0 + math.sin(wave_phase + (i / max(1, wave_len)) * math.tau) * wave_amp
-        if use_wave:
-            base_sleep = _clamp(_pick_tick(cluster), 0.0055, 0.0090)
-        else:
-            base_sleep = random.uniform(0.0050, 0.0100)
+        # Convert float movement to integer pixels with error feedback.
+        dfx = fx - last_fx
+        dfy = fy - last_fy
+        cx = dfx + err_x
+        cy = dfy + err_y
+        dx_i = int(round(cx))
+        dy_i = int(round(cy))
+        err_x = cx - dx_i
+        err_y = cy - dy_i
 
-        sleep_s = _scale_sleep(base_sleep * wave, speed_pct)
-        if last_xy is not None and last_xy == (xi, yi):
-            # accumulate time on previous step to avoid same-pixel jitter
-            if planned:
-                prev = planned[-1]
-                planned[-1] = PlannedStep(x=prev.x, y=prev.y, sleep_s=prev.sleep_s + sleep_s)
-            continue
+        nx_i, ny_i = ix + dx_i, iy + dy_i
+        xi, yi = clamp_point((nx_i, ny_i), bounds)
 
+        # If clamped, drop accumulated error for that axis to avoid fighting bounds.
+        if xi != nx_i:
+            err_x = 0.0
+        if yi != ny_i:
+            err_y = 0.0
+
+        ix, iy = xi, yi
+        last_fx, last_fy = fx, fy
+
+        sleep_s = _scale_sleep(base_sleep, speed_pct)
         planned.append(PlannedStep(x=xi, y=yi, sleep_s=sleep_s))
-        last_xy = (xi, yi)
-
-        # occasional micro-stop mid-move
-        if use_wave and dist > 200 and random.random() < 0.008:
-            pause = random.uniform(0.010, 0.060)
-            planned.append(PlannedStep(x=xi, y=yi, sleep_s=_scale_sleep(pause, speed_pct)))
 
     curx, cury = planned[-1].x, planned[-1].y
     for _ in range(10):
@@ -284,18 +287,9 @@ def plan_move(
         curx = int(curx + ddx * k)
         cury = int(cury + ddy * k)
         curx, cury = clamp_point((curx, cury), bounds)
-        if use_wave:
-            base_sleep = _clamp(_pick_tick(cluster), 0.0055, 0.0090)
-        else:
-            base_sleep = random.uniform(0.0050, 0.0100)
+        base_sleep = _pick_tick(cluster)
         sleep_s = _scale_sleep(base_sleep, speed_pct)
-        if last_xy is not None and last_xy == (curx, cury):
-            if planned:
-                prev = planned[-1]
-                planned[-1] = PlannedStep(x=prev.x, y=prev.y, sleep_s=prev.sleep_s + sleep_s)
-            continue
         planned.append(PlannedStep(x=curx, y=cury, sleep_s=sleep_s))
-        last_xy = (curx, cury)
 
     return planned
 

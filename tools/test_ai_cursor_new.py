@@ -4,6 +4,7 @@ import sys
 import time
 import json
 import random
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +14,97 @@ if str(ROOT) not in sys.path:
 from core.ai_cursor_movement import plan_move, clamp_point, get_default_bounds, CursorMotionConfig
 from config.areas import load_coords
 from core.bot_offsets import apply_offset
+
+
+def _today_stamp() -> str:
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def _compute_battery(used_sec: float, budget_sec: float) -> tuple[float | None, float | None]:
+    budget_sec = float(budget_sec)
+    used_sec = max(0.0, float(used_sec))
+    if budget_sec <= 0:
+        return None, None
+    fatigue = used_sec / budget_sec
+    if fatigue < 0.0:
+        fatigue = 0.0
+    if fatigue > 1.0:
+        fatigue = 1.0
+    battery = 1.0 - fatigue
+    if battery < 0.0:
+        battery = 0.0
+    if battery > 1.0:
+        battery = 1.0
+    return fatigue, battery
+
+
+def _load_manager_config() -> dict:
+    path = ROOT / "botmanager_config.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return {}
+
+
+def _pick_daily_budget_sec(cfg: dict, bot_id: int, *, date_str: str) -> float:
+    """
+    Mirror BotManager battery budget selection so dryruns match real runs:
+      - If *_min/_max is set: deterministic uniform pick per bot per day.
+      - Else: fixed hours/minutes (defaults to 8h).
+    """
+
+    def _get_float(key: str) -> float | None:
+        v = cfg.get(key, None)
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except Exception:
+            return None
+
+    def _get_int(key: str, default: int) -> int:
+        v = cfg.get(key, None)
+        if v is None:
+            return default
+        try:
+            return int(v)
+        except Exception:
+            return default
+
+    # Range budgets (stable per bot per day)
+    lo = _get_float(f"battery_budget_hours_min_{bot_id}")
+    hi = _get_float(f"battery_budget_hours_max_{bot_id}")
+    if lo is None or hi is None:
+        lo = _get_float("battery_budget_hours_min")
+        hi = _get_float("battery_budget_hours_max")
+
+    if lo is not None and hi is not None:
+        lo = max(0.0, float(lo))
+        hi = max(0.0, float(hi))
+        if hi < lo:
+            lo, hi = hi, lo
+        rng = random.Random(f"battery_budget_bot{int(bot_id)}_{date_str}")
+        hours = rng.uniform(lo, hi)
+        budget_sec = hours * 3600.0
+        # Round to whole minutes so it stays human-readable.
+        budget_sec = round(budget_sec / 60.0) * 60.0
+        return float(max(0.0, budget_sec))
+
+    # Fixed budgets
+    gh = _get_int("battery_budget_hours", 8)
+    gm = _get_int("battery_budget_minutes", 0)
+    h = _get_int(f"battery_budget_hours_{bot_id}", gh)
+    m = _get_int(f"battery_budget_minutes_{bot_id}", gm)
+
+    if h < 0:
+        h = 0
+    if m < 0:
+        m = 0
+    if m > 59:
+        m = 59
+    return float(h * 3600 + m * 60)
 
 
 def _rand_point_in_area(area_name: str, bot_id: int = 1, padding: int = 10) -> tuple[int, int]:
@@ -233,6 +325,7 @@ def _simulate_session(
     hours: float,
     points: int,
     padding: int,
+    battery_budget_sec: float,
 ) -> dict:
     sim_seconds = float(hours) * 3600.0
     pts = _pick_points(area, bot_id, count=points, padding=padding)
@@ -249,6 +342,8 @@ def _simulate_session(
     overshoot_count = 0
     idle_time = 0.0
     routine_id = f"dryrun_bot{bot_id}_{int(hours)}h_{int(time.time())}"
+    date_str = _today_stamp()
+    budget_sec = float(battery_budget_sec)
 
     # human rhythm waves: slow/fast phases
     phase_end = 0.0
@@ -334,28 +429,40 @@ def _simulate_session(
 
         m = _path_metrics(path)
         seg_id += 1
+        seg_start_t = t
+        seg_from = {"x": cur[0], "y": cur[1]}
+        seg_to = {"x": target[0], "y": target[1]}
         route_length += m["length"]
         route_max_speed = max(route_max_speed, m["max_speed"])
+        for x, y, dt in path:
+            t += dt * speed_wave * (1.0 + fatigue * 0.25)
+            events.append({"t": round(t, 6), "x": x, "y": y, "segment_id": seg_id, "phase": "main", "routine_id": routine_id, "route_id": route_id})
+        cur = clamp_point(target, bounds)
+        seg_end_t = t
+        bat_f0, bat_b0 = _compute_battery(seg_start_t, budget_sec)
+        bat_f1, bat_b1 = _compute_battery(seg_end_t, budget_sec)
         segments.append(
             {
                 "routine_id": routine_id,
                 "route_id": route_id,
                 "segment_id": seg_id,
                 "phase": "main",
-                "from": {"x": cur[0], "y": cur[1]},
-                "to": {"x": target[0], "y": target[1]},
+                "from": seg_from,
+                "to": seg_to,
                 "target_reached": True,
+                "sim_t_start": round(seg_start_t, 6),
+                "sim_t_end": round(seg_end_t, 6),
                 "duration": round(m["duration"], 6),
                 "path_length": round(m["length"], 3),
                 "max_speed": round(m["max_speed"], 3),
                 "through_mode": through_mode,
                 "tail_mode": tail_mode,
+                "battery_fatigue_start": bat_f0,
+                "battery_fatigue_end": bat_f1,
+                "battery_start": bat_b0,
+                "battery_end": bat_b1,
             }
         )
-        for x, y, dt in path:
-            t += dt * speed_wave * (1.0 + fatigue * 0.25)
-            events.append({"t": round(t, 6), "x": x, "y": y, "segment_id": seg_id, "phase": "main", "routine_id": routine_id, "route_id": route_id})
-        cur = clamp_point(target, bounds)
 
         # idle dwell on target
         # occasional "cognitive pause"
@@ -378,52 +485,78 @@ def _simulate_session(
                 jitter_path = _simulate_path(cur, (nx, ny), bias_x=bias_x)
                 m = _path_metrics(jitter_path)
                 seg_id += 1
+                seg_start_t = t
+                seg_from = {"x": cur[0], "y": cur[1]}
+                seg_to = {"x": nx, "y": ny}
                 route_length += m["length"]
                 route_max_speed = max(route_max_speed, m["max_speed"])
+                for x, y, dt in jitter_path:
+                    t += dt * speed_wave
+                    events.append({"t": round(t, 6), "x": x, "y": y, "segment_id": seg_id, "phase": "idle_jitter", "routine_id": routine_id, "route_id": route_id})
+                cur = clamp_point((nx, ny), bounds)
+                seg_end_t = t
+                bat_f0, bat_b0 = _compute_battery(seg_start_t, budget_sec)
+                bat_f1, bat_b1 = _compute_battery(seg_end_t, budget_sec)
                 segments.append(
                     {
                         "routine_id": routine_id,
                         "route_id": route_id,
                         "segment_id": seg_id,
                         "phase": "idle_jitter",
-                        "from": {"x": cur[0], "y": cur[1]},
-                        "to": {"x": nx, "y": ny},
+                        "from": seg_from,
+                        "to": seg_to,
                         "target_reached": False,
+                        "sim_t_start": round(seg_start_t, 6),
+                        "sim_t_end": round(seg_end_t, 6),
                         "duration": round(m["duration"], 6),
                         "path_length": round(m["length"], 3),
                         "max_speed": round(m["max_speed"], 3),
+                        "battery_fatigue_start": bat_f0,
+                        "battery_fatigue_end": bat_f1,
+                        "battery_start": bat_b0,
+                        "battery_end": bat_b1,
                     }
                 )
-                for x, y, dt in jitter_path:
-                    t += dt * speed_wave
-                    events.append({"t": round(t, 6), "x": x, "y": y, "segment_id": seg_id, "phase": "idle_jitter", "routine_id": routine_id, "route_id": route_id})
-                cur = clamp_point((nx, ny), bounds)
             # single return to target at end of idle cluster
             jitter_back = _simulate_path(cur, target, bias_x=bias_x)
             m = _path_metrics(jitter_back)
             seg_id += 1
+            seg_start_t = t
+            seg_from = {"x": cur[0], "y": cur[1]}
+            seg_to = {"x": target[0], "y": target[1]}
             route_length += m["length"]
             route_max_speed = max(route_max_speed, m["max_speed"])
+            for x, y, dt in jitter_back:
+                t += dt * speed_wave
+                events.append({"t": round(t, 6), "x": x, "y": y, "segment_id": seg_id, "phase": "idle_return", "routine_id": routine_id, "route_id": route_id})
+            cur = clamp_point(target, bounds)
+            seg_end_t = t
+            bat_f0, bat_b0 = _compute_battery(seg_start_t, budget_sec)
+            bat_f1, bat_b1 = _compute_battery(seg_end_t, budget_sec)
             segments.append(
                 {
                     "routine_id": routine_id,
                     "route_id": route_id,
                     "segment_id": seg_id,
                     "phase": "idle_return",
-                    "from": {"x": cur[0], "y": cur[1]},
-                    "to": {"x": target[0], "y": target[1]},
+                    "from": seg_from,
+                    "to": seg_to,
                     "target_reached": True,
+                    "sim_t_start": round(seg_start_t, 6),
+                    "sim_t_end": round(seg_end_t, 6),
                     "duration": round(m["duration"], 6),
                     "path_length": round(m["length"], 3),
                     "max_speed": round(m["max_speed"], 3),
+                    "battery_fatigue_start": bat_f0,
+                    "battery_fatigue_end": bat_f1,
+                    "battery_start": bat_b0,
+                    "battery_end": bat_b1,
                 }
             )
-            for x, y, dt in jitter_back:
-                t += dt * speed_wave
-                events.append({"t": round(t, 6), "x": x, "y": y, "segment_id": seg_id, "phase": "idle_return", "routine_id": routine_id, "route_id": route_id})
-            cur = clamp_point(target, bounds)
 
         # route summary
+        r_bat_f0, r_bat_b0 = _compute_battery(route_start_t, budget_sec)
+        r_bat_f1, r_bat_b1 = _compute_battery(t, budget_sec)
         routes.append(
             {
                 "route_id": route_id,
@@ -436,20 +569,35 @@ def _simulate_session(
                 "idle_time": round(route_idle, 6),
                 "through_mode": through_mode,
                 "tail_mode": tail_mode,
+                "battery_fatigue_start": r_bat_f0,
+                "battery_fatigue_end": r_bat_f1,
+                "battery_start": r_bat_b0,
+                "battery_end": r_bat_b1,
             }
         )
 
         idx += 1
 
+    used_sec = float(t)
+    bat_f, bat_b = _compute_battery(used_sec, budget_sec)
     return {
         "meta": {
             "routine_id": routine_id,
             "area": area,
             "bot_id": bot_id,
+            "date": date_str,
             "hours": hours,
             "points": points,
             "events": len(events),
             "notes": "dryrun with single-phase moves, tail variation, fatigue, asymmetry, overshoot/undershoot",
+            "battery": {
+                "budget_sec": round(budget_sec, 6),
+                "budget_hours": round(budget_sec / 3600.0, 6) if budget_sec > 0 else None,
+                "used_sec": round(used_sec, 6),
+                "fatigue": bat_f,
+                "battery": bat_b,
+                "source": "botmanager_config.json",
+            },
         },
         "events": events,
         "segments": segments,
@@ -469,9 +617,20 @@ def main():
     points = 7
     padding = 8
 
+    cfg = _load_manager_config()
+    date_str = _today_stamp()
+    budget_sec = _pick_daily_budget_sec(cfg, bot_id, date_str=date_str)
+
     print(f"[DryRun] ai_cursor simulate | area={area} bot={bot_id} hours={hours} points={points}")
     t0 = time.perf_counter()
-    payload = _simulate_session(area=area, bot_id=bot_id, hours=hours, points=points, padding=padding)
+    payload = _simulate_session(
+        area=area,
+        bot_id=bot_id,
+        hours=hours,
+        points=points,
+        padding=padding,
+        battery_budget_sec=budget_sec,
+    )
     elapsed = time.perf_counter() - t0
 
     out_dir = ROOT / "recordings"

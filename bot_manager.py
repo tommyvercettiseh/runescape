@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import time
+import random
 import subprocess
 import threading
 from datetime import datetime
@@ -22,6 +23,11 @@ try:
     from telemetry import update_state
 except Exception:
     update_state = None
+
+try:
+    from telemetry import battery_tracker as _battery_tracker
+except Exception:
+    _battery_tracker = None
 
 
 # =========================
@@ -816,6 +822,142 @@ class BotManagerGUI(tk.Tk):
     # =========================
     # PROCESS HELPERS
     # =========================
+    def _battery_budget_sec(self, bot_id: int) -> float:
+        """
+        Daily per-bot budget in seconds used for telemetry.battery_tracker.
+        Config keys (optional):
+          - battery_budget_hours / battery_budget_minutes (global)
+          - battery_budget_hours_{bot_id} / battery_budget_minutes_{bot_id} (per bot override)
+          - battery_budget_hours_min / battery_budget_hours_max (global daily range; stable per bot per day)
+          - battery_budget_hours_min_{bot_id} / battery_budget_hours_max_{bot_id} (per bot daily range override)
+        """
+
+        def _as_int(v, default: int) -> int:
+            try:
+                return int(v)
+            except Exception:
+                return default
+
+        def _as_float(v) -> float | None:
+            try:
+                return float(v)
+            except Exception:
+                return None
+
+        # If we already wrote today's battery file, keep using the same budget
+        # for the rest of the day (even if config changes mid-day).
+        date = _today_stamp()
+        day_path = PROJECT_ROOT / "telemetry" / "battery" / f"battery_bot{int(bot_id)}_{date}.json"
+        existing = load_json(day_path, {})
+        if isinstance(existing, dict):
+            b = existing.get("budget_sec")
+            if isinstance(b, (int, float)) and float(b) > 0:
+                return float(b)
+
+        # Optional: choose a per-day budget in a range (e.g. 7-10 hours).
+        min_h = self.config.get(f"battery_budget_hours_min_{bot_id}", None)
+        max_h = self.config.get(f"battery_budget_hours_max_{bot_id}", None)
+        if min_h is None or max_h is None:
+            min_h = self.config.get("battery_budget_hours_min", None)
+            max_h = self.config.get("battery_budget_hours_max", None)
+
+        lo = _as_float(min_h) if min_h is not None else None
+        hi = _as_float(max_h) if max_h is not None else None
+        if lo is not None and hi is not None:
+            lo = max(0.0, lo)
+            hi = max(0.0, hi)
+            if hi < lo:
+                lo, hi = hi, lo
+
+            # Deterministic "random" per bot per day. This avoids budget jitter
+            # across multiple sessions while still giving day-to-day variance.
+            rng = random.Random(f"battery_budget_bot{int(bot_id)}_{date}")
+            hours = rng.uniform(lo, hi)
+            budget_sec = max(0.0, hours * 3600.0)
+            # Round to nearest minute so logs look clean.
+            budget_sec = round(budget_sec / 60.0) * 60.0
+            return float(budget_sec)
+
+        gh = _as_int(self.config.get("battery_budget_hours", 8), 8)
+        gm = _as_int(self.config.get("battery_budget_minutes", 0), 0)
+
+        h = self.config.get(f"battery_budget_hours_{bot_id}", None)
+        m = self.config.get(f"battery_budget_minutes_{bot_id}", None)
+        if h is None:
+            h = gh
+        if m is None:
+            m = gm
+
+        h = _as_int(h, gh)
+        m = _as_int(m, gm)
+
+        if h < 0:
+            h = 0
+        if m < 0:
+            m = 0
+        if m > 59:
+            m = 59
+
+        return float(h * 3600 + m * 60)
+
+    def _battery_begin_session(self, bot_id: int, *, script_name: str, pid: int | None) -> None:
+        if _battery_tracker is None:
+            return
+
+        budget_sec = self._battery_budget_sec(bot_id)
+        started_at = time.time()
+        meta = {"source": "bot_manager", "script": str(script_name), "pid": pid}
+        try:
+            _battery_tracker.begin_session(
+                bot_id,
+                started_at=started_at,
+                budget_sec=budget_sec,
+                meta=meta,
+            )
+            open_path = PROJECT_ROOT / "telemetry" / "battery" / f"open_bot{int(bot_id)}.json"
+            self.log(f"[Battery] tracking started | bot={bot_id} budget_sec={int(budget_sec)} open={open_path}")
+        except Exception as e:
+            self.log(f"[Battery] begin_session error | bot={bot_id} err={e}")
+
+    def _battery_end_session(
+        self,
+        bot_id: int,
+        *,
+        reason: str,
+        script_name: str,
+        pid: int | None,
+        rc: int | None,
+    ) -> None:
+        if _battery_tracker is None:
+            return
+
+        ended_at = time.time()
+        meta = {"source": "bot_manager", "script": str(script_name), "pid": pid, "rc": rc}
+        try:
+            payload = _battery_tracker.end_session(
+                bot_id,
+                ended_at=ended_at,
+                reason=str(reason),
+                meta=meta,
+            )
+            if not payload:
+                return
+
+            date = payload.get("date") or _today_stamp()
+            day_path = PROJECT_ROOT / "telemetry" / "battery" / f"battery_bot{int(bot_id)}_{date}.json"
+            used_sec = payload.get("used_sec")
+            budget_sec = payload.get("budget_sec")
+            fatigue = payload.get("fatigue")
+            battery = payload.get("battery")
+
+            self.log(
+                f"[Battery] updated | bot={bot_id} date={date} used_sec={used_sec} budget_sec={budget_sec} "
+                f"fatigue={fatigue} battery={battery}"
+            )
+            self.log(f"[Battery] file: {day_path}")
+        except Exception as e:
+            self.log(f"[Battery] end_session error | bot={bot_id} err={e}")
+
     def _get_input_recorder(self, bot_id: int) -> BotInputRecorder:
         rec = self.input_recorders.get(bot_id)
         if rec is None:
@@ -905,6 +1047,14 @@ class BotManagerGUI(tk.Tk):
         except Exception as e:
             self.log(f"❌ Stop fout Bot {bot_id}: {e}")
         finally:
+            rc = proc.returncode if proc else None
+            self._battery_end_session(
+                bot_id,
+                reason="stop_bot",
+                script_name=self.bot_script_var[bot_id].get(),
+                pid=getattr(proc, "pid", None),
+                rc=(int(rc) if isinstance(rc, int) else None),
+            )
             if update_state:
                 rc = proc.returncode if proc else None
                 update_state(
@@ -1011,6 +1161,7 @@ class BotManagerGUI(tk.Tk):
                             )
 
                         self.processes[bot_id] = proc
+                        self._battery_begin_session(bot_id, script_name=sp.name, pid=getattr(proc, "pid", None))
 
                         threading.Thread(target=self._stream_output, args=(bot_id, proc), daemon=True).start()
                         self._start_input_recording(bot_id)
@@ -1032,6 +1183,13 @@ class BotManagerGUI(tk.Tk):
 
                         rc = proc.returncode or 0
                         self._stop_input_recording(bot_id, reason="process_exit")
+                        self._battery_end_session(
+                            bot_id,
+                            reason="process_exit",
+                            script_name=sp.name,
+                            pid=getattr(proc, "pid", None),
+                            rc=int(rc),
+                        )
                         if update_state:
                             update_state(
                                 bot_id,
