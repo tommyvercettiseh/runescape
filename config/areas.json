@@ -161,15 +161,6 @@
     ],
     "group": "default"
   },
-  "Slider_Area": {
-    "coords": [
-      365,
-      205,
-      385,
-      225
-    ],
-    "group": "default"
-  },
   "Bot_Area_Center": {
     "coords": [
       277,
@@ -493,5 +484,23 @@
       296
     ],
     "group": "Skilling"
+  },
+  "Slider_Area": {
+    "coords": [
+      365,
+      205,
+      385,
+      225
+    ],
+    "group": "Settings"
+  },
+  "Slider_Area_High": {
+    "coords": [
+      236,
+      204,
+      256,
+      224
+    ],
+    "group": "Settings"
   }
 }

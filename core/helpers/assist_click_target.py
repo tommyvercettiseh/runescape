@@ -68,7 +68,7 @@ def assist_click_target(
     if "min_px" in _legacy and min_size == 80:
         min_size = _legacy["min_px"]
 
-    if "erode_px" in _legacy and deep_erode_px == 3:
+    if "erode_px" in _legacy:
         deep_erode_px = _legacy["erode_px"]
     if "dilate" in _legacy and dilate_px == 2:
         dilate_px = _legacy["dilate"]

@@ -1,13 +1,13 @@
 {
   "active": false,
   "ui_status": "stopped",
-  "script": "woodcutting.py",
-  "script_path": "C:\\Users\\Hesse\\Desktop\\Runescape\\scripts\\woodcutting.py",
-  "started_at": 1769859142.488487,
+  "script": "combat.py",
+  "script_path": "C:\\Users\\Hesse\\Desktop\\Runescape\\scripts\\combat.py",
+  "started_at": 1770189572.9681458,
   "bot_id": 2,
-  "updated_at": "2026-01-31T11:32:28.398979Z",
+  "updated_at": "2026-02-04T07:19:34.667995Z",
   "last_rc": 1,
-  "ended_at": 1769859148.3874404,
+  "ended_at": 1770189574.6588607,
   "status": "done",
   "runtime_s": 26
 }

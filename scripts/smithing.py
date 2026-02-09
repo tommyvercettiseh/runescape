@@ -45,6 +45,7 @@ def main():
     game_on_button(bot_id=BOT_ID)
     assist_click_tab("Inventory", bot_id=BOT_ID, verbose=VERBOSE)
     assist_close_screen(bot_id=BOT_ID, verbose=VERBOSE)
+
 # CAN WE START? 
 # ============================================================
     if not can_start(bot_id=BOT_ID, verbose=VERBOSE, trace=TRACE):
@@ -95,11 +96,12 @@ def main():
 
                 if click_image(IMAGE_TO_USE, "Bot_Area", bot_id=BOT_ID, verbose=VERBOSE):
                     print(f"{IMAGE_TO_USE} found")
-                    sleep_custom(1.1241, 1.7811)
+                    sleep_custom(0.5241, 1.7811)
                     assist_close_screen(bot_id=BOT_ID, verbose=VERBOSE)
-                    sleep_custom(1.1241, 2.1811)
+                    sleep_custom(0.5241, 1.1811)
                 else:
-                    assist_click_exclude(bot_id=1, verbose=VERBOSE)
+                    assist_close_screen(bot_id=BOT_ID, verbose=VERBOSE)
+                    assist_click_exclude(bot_id=BOT_ID, verbose=VERBOSE)
                     print("click_image failed -> exclude")
                     return
 

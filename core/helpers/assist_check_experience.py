@@ -66,6 +66,6 @@ if __name__ == "__main__":
     print("🧪  Test assist_check_experience\n")
 
     # 1 skill
-    assist_check_experience("Woodcutting", bot_id=1, verbose=True)
+    assist_check_experience("Crafting", bot_id=1, verbose=True)
     print("\n🔁  Rotatie test\n")
     assist_check_experience("Woodcutting", "Fishing", bot_id=1, verbose=True)

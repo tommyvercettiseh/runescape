@@ -4,7 +4,6 @@
 from pathlib import Path
 import sys
 import os
-import random
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -21,28 +20,43 @@ VERBOSE = False
 DEBUG = False
 
 # ============================================================
-
-EXCLUDE_SLOTS = {1}
-
-EXCLUDE_IMAGES = [
-    "Item_SmallFishingNet.png",
-    "Item_Feathers.png",
-    "Item_FlyFishingRod.png",
-]
-
-CONTINUE_IMAGE =    "Continue_Gold_Ring.png"
-
-# ============================================================
-# AUTOLOAD 🧠 
+# AUTOLOAD 🧠
 # ============================================================
 from core.autoload import autoload
 autoload(globals(), verbose=VERBOSE)
+
+# ✅ Scroll import (jouw nieuwe functie + config)
+from core.ai_cursor import scroll, ScrollConfig
 
 # ============================================================
 # START 🧱
 # ============================================================
 def main():
-        assist_random_event(bot_id=BOT_ID,area="Bot_Area",verbose=True,package="core.helpers.random")
+    print("🧪 scroll test start")
+    move_in_area("Bot_Area", bot_id=1, verbose=True, padding=3)
+
+    scroll(
+        direction="down",
+        cfg=ScrollConfig(
+            min_steps=8,
+            max_steps=18,
+            step_min=1,
+            step_max=3,
+            delay_min=0.18,
+            delay_max=0.35,
+            jitter_chance=0.08,
+            jitter_min=1,
+            jitter_max=1,
+        ),
+        speed_pct=100.0,
+        verbose=True,
+    )
+
+
+
+
+    print("✅ scroll test done")
+
 
 if __name__ == "__main__":
-     main()
+    main()

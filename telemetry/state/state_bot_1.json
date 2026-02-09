@@ -2,12 +2,12 @@
   "active": false,
   "ui_status": "done",
   "last_rc": 0,
-  "ended_at": 1769859142.3482318,
+  "ended_at": 1770386106.350683,
   "bot_id": 1,
-  "updated_at": "2026-01-31T11:32:22.361611Z",
-  "script": "combat.py",
-  "script_path": "C:\\Users\\Hesse\\Desktop\\Runescape\\scripts\\combat.py",
-  "started_at": 1769859126.5103238,
+  "updated_at": "2026-02-06T13:55:06.359794Z",
+  "script": "smithing.py",
+  "script_path": "C:\\Users\\Hesse\\Desktop\\Runescape\\scripts\\smithing.py",
+  "started_at": 1770386086.2796373,
   "status": "fail",
   "runtime_s": 6
 }

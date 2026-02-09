@@ -544,5 +544,11 @@
     "min_shape": 95.0,
     "min_color": 90.0,
     "area": "Inventory_Area"
+  },
+  "Tab_Logout_Confirm2.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 91.0,
+    "area": "Tab_Confirmation_Area"
   }
 }

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from tkinter import messagebox, simpledialog, ttk
 
-
 # ============================================================
 # BOOTSTRAP: project-root in sys.path
 # ============================================================
@@ -17,7 +16,6 @@ if str(ROOT) not in sys.path:
 
 from core.bot_offsets import get_offset  # noqa: E402
 
-
 # ============================================================
 # FILES
 # ============================================================
@@ -25,7 +23,6 @@ AREAS_FILE = ROOT / "config" / "areas.json"
 AREAS_FILE.parent.mkdir(parents=True, exist_ok=True)
 if not AREAS_FILE.exists():
     AREAS_FILE.write_text("{}", encoding="utf-8")
-
 
 # ============================================================
 # UI CONSTANTS
@@ -93,7 +90,6 @@ class AreasUIv2(tk.Tk):
         self.label_ids: dict[str, int] = {}
         self.handle_ids: dict[str, dict[str, int]] = {}
         self.move_ids: dict[str, int] = {}
-        self.move_text_ids: dict[str, int] = {}
 
         # History (optional light)
         self.undo_stack: dict[str, list[list[int]]] = {}
@@ -159,7 +155,6 @@ class AreasUIv2(tk.Tk):
     def color_for_name(self, name: str) -> str:
         """
         Stable bright color, ALWAYS valid #RRGGBB.
-        (je crash kwam doordat mijn vorige variant soms >255 werd -> "#10b..." etc)
         """
         h = abs(hash(name))
         r = 128 + (h % 128)
@@ -429,7 +424,6 @@ class AreasUIv2(tk.Tk):
         self.label_ids.clear()
         self.handle_ids.clear()
         self.move_ids.clear()
-        self.move_text_ids.clear()
 
         for name in sorted(self.data.keys(), key=lambda s: s.lower()):
             if name not in self.visible_areas:
@@ -471,6 +465,10 @@ class AreasUIv2(tk.Tk):
             self.handle_ids[name][k] = hid
 
     def _draw_move_handle(self, name: str, x1: int, y1: int, x2: int, y2: int):
+        """
+        ✅ FIX: geen unicode icoontje meer (dat gaf '?' bij sommige fonts)
+        Drag blijft werken via tag "movehandle"
+        """
         cx = int((x1 + x2) / 2)
         cy = int((y1 + y2) / 2)
 
@@ -483,15 +481,6 @@ class AreasUIv2(tk.Tk):
             tags=("movehandle", name),
         )
         self.move_ids[name] = mid
-
-        tid = self.canvas.create_text(
-            cx, cy,
-            text="⤧",
-            fill="#ffffff",
-            font=("Arial", 16, "bold"),
-            tags=("movehandle", name),
-        )
-        self.move_text_ids[name] = tid
 
     def _handle_positions(self, x1, y1, x2, y2):
         return {

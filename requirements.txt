@@ -1,0 +1,9 @@
+pillow
+opencv-python
+numpy
+pyautogui
+keyboard
+mss
+pynput
+fastapi
+uvicorn

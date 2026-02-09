@@ -56,6 +56,9 @@ def assist_logout(*, bot_id=1, timeout=15, verbose=False):
         click_image("Logout_ClickHereToLogout.png", "Inventory_Area", bot_id, verbose=False)
         random_sleep()
 
+        click_image("Logout_ClickHereToLogout2.png", "Inventory_Area", bot_id, verbose=False)
+        random_sleep()
+
     verbose and print("⚠️  🚪  Uitloggen mislukt    | timeout")
     return False
 

@@ -468,5 +468,10 @@
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
     "min_color": 90.0
+  },
+  "Tab_Logout_Confirm2.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 95.0,
+    "min_color": 91.0
   }
 }

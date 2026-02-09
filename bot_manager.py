@@ -6,9 +6,17 @@ import json
 import time
 import subprocess
 import threading
+from datetime import datetime
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
+
+try:
+    from pynput import mouse as _pynput_mouse
+    from pynput import keyboard as _pynput_keyboard
+except Exception:
+    _pynput_mouse = None
+    _pynput_keyboard = None
 
 try:
     from telemetry import update_state
@@ -19,7 +27,9 @@ except Exception:
 # =========================
 # PATHS
 # =========================
+
 PROJECT_ROOT = Path(r"C:\Users\Hesse\Desktop\Runescape")
+
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 RUNNER_PATH = PROJECT_ROOT / "runner.py"
 OVERLAY_LAUNCHER = PROJECT_ROOT / "tools" / "overlay_launcher.py"
@@ -57,6 +67,183 @@ def list_scripts_map() -> dict[str, str]:
     return dict(sorted(mapping.items(), key=lambda kv: kv[0].lower()))
 
 
+def _now_stamp() -> str:
+    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+
+def _today_stamp() -> str:
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def _key_to_str(k) -> str:
+    try:
+        return k.char  # type: ignore[attr-defined]
+    except Exception:
+        return str(k).replace("Key.", "")
+
+
+class BotInputRecorder:
+    def __init__(self, bot_id: int, out_dir: Path, log_fn):
+        self.bot_id = bot_id
+        self.out_dir = out_dir
+        self.log = log_fn
+
+        self.running = False
+        self.t0 = 0.0
+        self.events: list[dict] = []
+        self._last_t: float | None = None
+        self._key_down: dict[str, float] = {}
+        self._lock = threading.Lock()
+        self._listeners_started = False
+
+        if _pynput_mouse is not None and _pynput_keyboard is not None:
+            self._mouse_listener = _pynput_mouse.Listener(
+                on_move=self._on_move,
+                on_click=self._on_click,
+                on_scroll=self._on_scroll,
+            )
+            self._kb_listener = _pynput_keyboard.Listener(
+                on_press=self._on_press,
+                on_release=self._on_release,
+            )
+        else:
+            self._mouse_listener = None
+            self._kb_listener = None
+
+    def _available(self) -> bool:
+        return _pynput_mouse is not None and _pynput_keyboard is not None
+
+    def start(self) -> bool:
+        if not self._available():
+            self.log("❌ Recorder: pynput ontbreekt, kan geen input loggen")
+            return False
+        if not self._listeners_started:
+            self._listeners_started = True
+            if self._mouse_listener:
+                self._mouse_listener.start()
+            if self._kb_listener:
+                self._kb_listener.start()
+        self.running = True
+        self.t0 = time.perf_counter()
+        with self._lock:
+            self.events.clear()
+            self._last_t = None
+            self._key_down.clear()
+        return True
+
+    def stop_and_save(self, reason: str = "") -> Path | None:
+        if not self.running:
+            return None
+
+        self.running = False
+        with self._lock:
+            duration = self.events[-1]["t"] if self.events else 0.0
+            events_copy = list(self.events)
+
+        session = {
+            "created": _now_stamp(),
+            "bot_id": self.bot_id,
+            "duration_sec": round(float(duration), 6),
+            "events": len(events_copy),
+            "reason": reason,
+            "source": "bot_manager",
+            "data": events_copy,
+        }
+
+        self.out_dir.mkdir(parents=True, exist_ok=True)
+        out = self.out_dir / f"input_log_bot{self.bot_id}_{_today_stamp()}.json"
+
+        existing = load_json(out, None)
+        if isinstance(existing, dict) and "sessions" in existing:
+            payload = existing
+            if payload.get("bot_id") != self.bot_id:
+                payload["bot_id"] = self.bot_id
+            payload.setdefault("date", _today_stamp())
+            payload.setdefault("sessions", [])
+            payload["sessions"].append(session)
+        else:
+            payload = {
+                "bot_id": self.bot_id,
+                "date": _today_stamp(),
+                "sessions": [session],
+            }
+
+        out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return out
+
+    def _t(self) -> float:
+        return time.perf_counter() - self.t0
+
+    def _push(self, e: dict) -> None:
+        if not self.running:
+            return
+        with self._lock:
+            if self._last_t is None:
+                e["dt"] = 0.0
+            else:
+                e["dt"] = round(e["t"] - self._last_t, 6)
+            self._last_t = e["t"]
+            self.events.append(e)
+
+    # -------------------------
+    # MOUSE
+    # -------------------------
+    def _on_move(self, x: int, y: int) -> None:
+        self._push({"t": self._t(), "type": "mouse_move", "x": int(x), "y": int(y)})
+
+    def _on_click(self, x: int, y: int, btn, pressed: bool) -> None:
+        b = "right" if btn == _pynput_mouse.Button.right else "left"
+        self._push(
+            {
+                "t": self._t(),
+                "type": "mouse_click",
+                "x": int(x),
+                "y": int(y),
+                "button": b,
+                "pressed": bool(pressed),
+            }
+        )
+
+    def _on_scroll(self, x: int, y: int, dx: int, dy: int) -> None:
+        dx = int(dx)
+        dy = int(dy)
+        if dx == 0 and dy == 0:
+            return
+        self._push(
+            {
+                "t": self._t(),
+                "type": "mouse_scroll",
+                "x": int(x),
+                "y": int(y),
+                "dx": dx,
+                "dy": dy,
+            }
+        )
+
+    # -------------------------
+    # KEYBOARD
+    # -------------------------
+    def _on_press(self, k) -> None:
+        key = _key_to_str(k)
+        now = self._t()
+        self._key_down[key] = now
+        self._push({"t": now, "type": "key_down", "key": key})
+
+    def _on_release(self, k) -> None:
+        key = _key_to_str(k)
+        now = self._t()
+        started = self._key_down.pop(key, None)
+        dur = round(now - started, 6) if started is not None else None
+        self._push(
+            {
+                "t": now,
+                "type": "key_up",
+                "key": key,
+                "held_sec": dur,
+            }
+        )
+
+
 # =========================
 # GUI
 # =========================
@@ -83,6 +270,7 @@ class BotManagerGUI(tk.Tk):
         self.scripts = list(self.scripts_map.keys())
 
         self.processes: dict[int, subprocess.Popen] = {}
+        self.input_recorders: dict[int, BotInputRecorder] = {}
 
         self.overlay_proc: subprocess.Popen | None = None
         self.carousel_thread: threading.Thread | None = None
@@ -107,6 +295,7 @@ class BotManagerGUI(tk.Tk):
 
         # Loop mode: 1 = 1 ronde, 2 = oneindig
         self.loop_mode_var = tk.IntVar()
+        self.delay_var = tk.IntVar()
 
         # HOTKEY STATE
         self.is_paused = False
@@ -328,6 +517,29 @@ class BotManagerGUI(tk.Tk):
         self.runtime_label.grid(row=1, column=2, rowspan=2, sticky="w", padx=10)
         self._update_runtime()
 
+        try:
+            delay_seconds = int(self.config.get("delay_seconds", 0))
+        except Exception:
+            delay_seconds = 0
+        self.delay_var.set(delay_seconds)
+
+        tk.Label(runtime, text="Delay (sec)", bg="#1b1d1e", fg="#d2ffe6").grid(row=3, column=0, sticky="w", padx=10)
+        delay_spin = tk.Spinbox(
+            runtime,
+            from_=0,
+            to=3600,
+            width=6,
+            textvariable=self.delay_var,
+            command=self.save_config,
+            bg="#0f1213",
+            fg="#d2ffe6",
+            buttonbackground="#0f1213",
+            highlightthickness=0,
+        )
+        delay_spin.grid(row=3, column=1, sticky="w", padx=6, pady=(0, 8))
+        delay_spin.bind("<FocusOut>", lambda _e: self.save_config())
+        delay_spin.bind("<Return>", lambda _e: self.save_config())
+
         mode = tk.Frame(self, bg="#1b1d1e", bd=2, relief="ridge")
         mode.pack(padx=10, pady=(8, 0), fill="x")
 
@@ -411,6 +623,7 @@ class BotManagerGUI(tk.Tk):
         self.config["runtime_hours"] = int(self.scale_hours.get())
         self.config["runtime_minutes"] = int(self.scale_minutes.get())
         self.config["loop_mode"] = int(self.loop_mode_var.get())
+        self.config["delay_seconds"] = self._delay_seconds()
 
         save_json(CONFIG_FILE, self.config)
 
@@ -437,6 +650,43 @@ class BotManagerGUI(tk.Tk):
         h = int(self.scale_hours.get())
         m = int(self.scale_minutes.get())
         return h * 3600 + m * 60
+
+    def _delay_seconds(self) -> int:
+        try:
+            value = int(self.delay_var.get())
+        except Exception:
+            value = 0
+        if value < 0:
+            value = 0
+        if value > 3600:
+            value = 3600
+        try:
+            self.delay_var.set(value)
+        except Exception:
+            pass
+        return value
+
+    def _has_next_active_bot(self, current_bot_id: int) -> bool:
+        try:
+            idx = BOT_IDS.index(current_bot_id)
+        except ValueError:
+            return False
+        return any(self.bot_active_var[b].get() for b in BOT_IDS[idx + 1 :])
+
+    def _sleep_with_pause(self, total_sec: float) -> bool:
+        remaining = float(total_sec)
+        if remaining <= 0:
+            return True
+        while remaining > 0:
+            if self.carousel_stop.is_set():
+                return False
+            if self.is_paused:
+                time.sleep(0.15)
+                continue
+            step = min(0.2, remaining)
+            time.sleep(step)
+            remaining -= step
+        return True
 
     # =========================
     # STATUS + CONTROLS
@@ -566,6 +816,27 @@ class BotManagerGUI(tk.Tk):
     # =========================
     # PROCESS HELPERS
     # =========================
+    def _get_input_recorder(self, bot_id: int) -> BotInputRecorder:
+        rec = self.input_recorders.get(bot_id)
+        if rec is None:
+            rec = BotInputRecorder(bot_id, PROJECT_ROOT / "recordings", self.log)
+            self.input_recorders[bot_id] = rec
+        return rec
+
+    def _start_input_recording(self, bot_id: int) -> None:
+        rec = self._get_input_recorder(bot_id)
+        if rec.start():
+            self.log(f"🎥 Input wordt opgenomen (Bot {bot_id})")
+            self.log(f"🧾 Logs map: {rec.out_dir}")
+
+    def _stop_input_recording(self, bot_id: int, reason: str = "") -> None:
+        rec = self.input_recorders.get(bot_id)
+        if not rec:
+            return
+        out = rec.stop_and_save(reason=reason)
+        if out:
+            self.log(f"🧾 Input log saved: {out.name}")
+
     def _get_script_path(self, bot_id: int) -> Path | None:
         script_name = self.bot_script_var[bot_id].get()
         real_path = self.scripts_map.get(script_name, "")
@@ -623,6 +894,7 @@ class BotManagerGUI(tk.Tk):
             self.processes.pop(bot_id, None)
             return
         try:
+            self._stop_input_recording(bot_id, reason="stop_bot")
             self.log(f"⛔ Stop Bot {bot_id}")
             proc.terminate()
             try:
@@ -741,6 +1013,7 @@ class BotManagerGUI(tk.Tk):
                         self.processes[bot_id] = proc
 
                         threading.Thread(target=self._stream_output, args=(bot_id, proc), daemon=True).start()
+                        self._start_input_recording(bot_id)
 
                         while proc.poll() is None:
                             if self.carousel_stop.is_set():
@@ -758,6 +1031,7 @@ class BotManagerGUI(tk.Tk):
                             time.sleep(0.2)
 
                         rc = proc.returncode or 0
+                        self._stop_input_recording(bot_id, reason="process_exit")
                         if update_state:
                             update_state(
                                 bot_id,
@@ -768,7 +1042,14 @@ class BotManagerGUI(tk.Tk):
                             )
 
                         self.set_status(bot_id, "done" if rc == 0 else "fail")
-                        time.sleep(0.12)
+                        if not self._sleep_with_pause(0.12):
+                            return
+
+                        delay_s = self._delay_seconds()
+                        if delay_s > 0 and self._has_next_active_bot(bot_id):
+                            self.log(f"⏳ Wacht {delay_s}s voor volgende bot")
+                            if not self._sleep_with_pause(delay_s):
+                                return
 
                     self.log(f"✅ Ronde {ronde} klaar")
 

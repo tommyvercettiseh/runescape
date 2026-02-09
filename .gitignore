@@ -1,0 +1,29 @@
+# venv
+.venv/
+venv/
+
+# python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# logs / runtime
+logs/
+*.log
+
+# builds
+build/
+dist/
+*.spec
+
+# env
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editors
+.vscode/
+.idea/

@@ -27,14 +27,22 @@ from core.bot_offsets import apply_offset
 Point = Tuple[int, int]
 Bounds = Tuple[int, int, int, int]
 
+"""
+High-refresh tuning notes:
+- For 144 Hz, target tick ~= 6.94 ms.
+- Keep tick variation minimal; move "humanity" into trajectory, not timing.
+"""
+
 # ============================================================
 # TWEAKS
 # ============================================================
 USE_VIRTUAL_BOUNDS = True
 MAX_DURATION_PER_MOVE = 1.65
 
-TICK_MIN = 0.006
-TICK_MAX = 0.011
+TARGET_HZ = 144.0
+TARGET_TICK = 1.0 / TARGET_HZ  # ~0.00694s
+TICK_MIN = 0.0058
+TICK_MAX = 0.0082
 
 SPEED_MIN_PX_S = 700
 SPEED_MAX_PX_S = 1500
@@ -132,8 +140,16 @@ def _bezier2(p0: Point, p1: Tuple[float, float], p2: Point, t: float) -> Tuple[f
     return x, y
 
 
-def _pick_tick() -> float:
-    return random.uniform(TICK_MIN, TICK_MAX)
+def _pick_tick(cluster: float | None = None) -> float:
+    """
+    Pick a tick near 1/144s with small drift.
+    Keep variation minimal to avoid visible jitter at high refresh.
+    """
+    if cluster is None:
+        cluster = TARGET_TICK
+    jitter = random.uniform(-0.0010, 0.0010)
+    v = cluster + jitter
+    return _clamp(v, TICK_MIN, TICK_MAX)
 
 
 def _speed_for_dist(dist: float) -> float:
@@ -165,6 +181,10 @@ def plan_move(
 
     if dist <= 1.0:
         return [PlannedStep(x=x2, y=y2, sleep_s=0.0)]
+    # micro moves: direct, no planner feel (smooth at 144 Hz)
+    if dist < 8.0:
+        sleep_s = random.uniform(0.003, 0.010)
+        return [PlannedStep(x=x2, y=y2, sleep_s=_scale_sleep(sleep_s, speed_pct))]
 
     speed = _speed_for_dist(dist)
     duration = dist / speed
@@ -200,6 +220,14 @@ def plan_move(
     fx, fy = float(x1), float(y1)
     planned: List[PlannedStep] = []
 
+    use_wave = dist > 60.0
+    # speed wave per move (prevents metronome timing) only for larger moves
+    wave_len = random.randint(8, 18) if use_wave else 1
+    wave_phase = random.uniform(0.0, math.tau) if use_wave else 0.0
+    wave_amp = random.uniform(0.02, 0.06) if use_wave else 0.0
+    cluster = TARGET_TICK if use_wave else None
+
+    last_xy: tuple[int, int] | None = None
     for i in range(1, steps + 1):
         t = i / steps
         s = _ease_in_out_quad(t)
@@ -223,8 +251,27 @@ def plan_move(
             fx, fy = tx, ty
 
         xi, yi = clamp_point((int(round(fx)), int(round(fy))), bounds)
-        base_sleep = _clamp(_pick_tick(), 0.002, 0.02)
-        planned.append(PlannedStep(x=xi, y=yi, sleep_s=_scale_sleep(base_sleep, speed_pct)))
+        wave = 1.0 + math.sin(wave_phase + (i / max(1, wave_len)) * math.tau) * wave_amp
+        if use_wave:
+            base_sleep = _clamp(_pick_tick(cluster), 0.0055, 0.0090)
+        else:
+            base_sleep = random.uniform(0.0050, 0.0100)
+
+        sleep_s = _scale_sleep(base_sleep * wave, speed_pct)
+        if last_xy is not None and last_xy == (xi, yi):
+            # accumulate time on previous step to avoid same-pixel jitter
+            if planned:
+                prev = planned[-1]
+                planned[-1] = PlannedStep(x=prev.x, y=prev.y, sleep_s=prev.sleep_s + sleep_s)
+            continue
+
+        planned.append(PlannedStep(x=xi, y=yi, sleep_s=sleep_s))
+        last_xy = (xi, yi)
+
+        # occasional micro-stop mid-move
+        if use_wave and dist > 200 and random.random() < 0.008:
+            pause = random.uniform(0.010, 0.060)
+            planned.append(PlannedStep(x=xi, y=yi, sleep_s=_scale_sleep(pause, speed_pct)))
 
     curx, cury = planned[-1].x, planned[-1].y
     for _ in range(10):
@@ -237,8 +284,18 @@ def plan_move(
         curx = int(curx + ddx * k)
         cury = int(cury + ddy * k)
         curx, cury = clamp_point((curx, cury), bounds)
-        base_sleep = _clamp(_pick_tick(), 0.002, 0.02)
-        planned.append(PlannedStep(x=curx, y=cury, sleep_s=_scale_sleep(base_sleep, speed_pct)))
+        if use_wave:
+            base_sleep = _clamp(_pick_tick(cluster), 0.0055, 0.0090)
+        else:
+            base_sleep = random.uniform(0.0050, 0.0100)
+        sleep_s = _scale_sleep(base_sleep, speed_pct)
+        if last_xy is not None and last_xy == (curx, cury):
+            if planned:
+                prev = planned[-1]
+                planned[-1] = PlannedStep(x=prev.x, y=prev.y, sleep_s=prev.sleep_s + sleep_s)
+            continue
+        planned.append(PlannedStep(x=curx, y=cury, sleep_s=sleep_s))
+        last_xy = (curx, cury)
 
     return planned
 

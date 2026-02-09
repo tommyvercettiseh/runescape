@@ -2,12 +2,12 @@
   "status": "unknown",
   "runtime_s": 0,
   "bot_id": 3,
-  "updated_at": "2026-01-31T11:32:04.024515Z",
+  "updated_at": "2026-02-01T19:13:04.609537Z",
   "active": false,
   "ui_status": "done",
   "script": "smithing.py",
   "script_path": "C:\\Users\\Hesse\\Desktop\\Runescape\\scripts\\smithing.py",
-  "started_at": 1769859119.194339,
+  "started_at": 1769973183.584054,
   "last_rc": 0,
-  "ended_at": 1769859124.0141764
+  "ended_at": 1769973184.5988805
 }

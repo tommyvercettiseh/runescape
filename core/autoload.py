@@ -115,7 +115,7 @@ def _build_exports(*, verbose=False) -> dict[str, object]:
         ),
     ]
 
-    loaded, _origins = load_exports(specs, verbose=verbose, fail_on_dupes=True, skip_import_errors=True)
+    loaded, _origins = load_exports(specs, verbose=verbose, fail_on_dupes=True, skip_import_errors=False)
     exports = dict(loaded)
 
     _apply_aliases(exports, verbose=verbose)
