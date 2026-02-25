@@ -1,0 +1,48 @@
+Mouse Lab · Hes Signature Protocol Summary
+session_id: 2026-02-25_150019
+mode: NORMAL
+phase1_reps: 30
+phase2_reps: 36
+phase3_blocks: 16
+
+Globals (p10/p50/p90):
+  time_to_end_ms: n=178 p10=635.429 p50=6458.803 p90=15897.905
+  approach_time_ms: n=178 p10=503.478 p50=6038.843 p90=15683.819
+  tail_time_ms: n=178 p10=47.526 p50=120.582 p90=504.657
+  dwell_in_target_ms: n=178 p10=43.919 p50=105.782 p90=210.644
+  overshoot_px: n=178 p10=18.948 p50=30.672 p90=35.744
+  max_speed_px_s: n=178 p10=3553.808 p50=5607.401 p90=9092.066
+  median_speed_px_s: n=178 p10=111.864 p50=175.891 p90=668.254
+  stop_time_ms: n=178 p10=215.861 p50=1564.66 p90=4517.488
+  miss_clicks: n=178 p10=0.0 p50=0.0 p90=1.0
+  end_dx: n=178 p10=-11.3 p50=1.0 p90=10.3
+  end_dy: n=178 p10=-10.3 p50=-1.0 p90=5.0
+  end_radial_error: n=178 p10=3.473 p50=8.062 p90=18.729
+  jerk_p50: n=178 p10=1919631.478 p50=3486917.852 p90=5863150.155
+  jerk_p90: n=178 p10=14603917.537 p50=20244161.585 p90=48020774.708
+  curv_p90: n=178 p10=0.04 p50=0.232 p90=0.555
+  pre_click_ms: n=178 p10=47.288 p50=120.354 p90=504.445
+  click_hold_ms: n=178 p10=0.0 p50=0.0 p90=0.0
+
+By phase:
+  phase 1 (n=30):
+    time_to_end_ms: n=30 p10=531.259 p50=671.079 p90=915.258
+    overshoot_px: n=30 p10=16.524 p50=29.165 p90=34.953
+    max_speed_px_s: n=30 p10=3166.855 p50=4718.076 p90=8018.593
+    median_speed_px_s: n=30 p10=217.418 p50=419.858 p90=749.574
+    end_radial_error: n=30 p10=3.961 p50=14.227 p90=21.301
+    jerk_p90: n=30 p10=17371759.424 p50=29945546.186 p90=49436984.33
+  phase 2 (n=36):
+    time_to_end_ms: n=36 p10=626.141 p50=731.105 p90=983.86
+    overshoot_px: n=36 p10=17.416 p50=24.885 p90=34.141
+    max_speed_px_s: n=36 p10=3608.778 p50=7993.78 p90=10060.697
+    median_speed_px_s: n=36 p10=248.503 p50=510.634 p90=982.922
+    end_radial_error: n=36 p10=4.298 p50=15.715 p90=21.886
+    jerk_p90: n=36 p10=25548230.68 p50=44949104.233 p90=89783780.333
+  phase 3 (n=112):
+    time_to_end_ms: n=112 p10=4647.711 p50=10303.89 p90=17498.023
+    overshoot_px: n=112 p10=25.747 p50=31.413 p90=36.115
+    max_speed_px_s: n=112 p10=4456.841 p50=5581.32 p90=8595.001
+    median_speed_px_s: n=112 p10=64.829 p50=174.772 p90=248.482
+    end_radial_error: n=112 p10=2.828 p50=7.28 p90=11.701
+    jerk_p90: n=112 p10=13995677.557 p50=18983524.061 p90=24980611.172

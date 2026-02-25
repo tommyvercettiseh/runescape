@@ -1,4 +1,5 @@
 ﻿import sys
+import time
 from pathlib import Path
 import random
 
@@ -43,13 +44,13 @@ def assist_close_screen(bot_id=1, verbose=True):
     else:
         verbose and print("⏳  🪟  Sluiten via ESC")
         press_key("esc")
-        random_sleep()
+        time.sleep(random.triangular(1.51, 2.12, 3.23))
 
         # fallback: ESC faalde
         if detect_image(IMAGE, AREA, bot_id, verbose=False):
             verbose and print("⚠️  🪟  ESC faalde   → fallback click")
             click_image(IMAGE, AREA, bot_id, verbose=False)
-            random_sleep()
+        time.sleep(random.triangular(1.51, 2.12, 3.23))
 
     # 🔁 Eindcheck
     if not detect_image(IMAGE, AREA, bot_id, verbose=False):

@@ -86,6 +86,9 @@ def main():
 
 # IS OUR INVENTORY EMPTY? READY TO GO?
 # ============================================================
+    import inspect
+    print("assist_banking file:", inspect.getsourcefile(assist_banking))
+
     if not detect_image(IMAGE_TO_USE, "Inventory_Area", bot_id=BOT_ID, verbose=VERBOSE):
 
         if assist_banking(bot_id=BOT_ID, timeout_s=10):

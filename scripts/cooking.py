@@ -5,7 +5,9 @@ from pathlib import Path
 import sys
 import os
 
-ROOT = Path(__file__).resolve().parents[1]
+from core.helpers.assist_banking import assist_banking
+
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -64,7 +66,7 @@ VERBOSE = True
 # MAIN
 # ============================================================
 def main():
-
+    assist_banking(bot_id=BOT_ID, timeout_s=10, verbose=True)
 # CLICK TARGET
 # ============================================================
     if assist_click_target(kleur="rood", area="Bot_Area", bot_id=BOT_ID, min_size=100, verbose=VERBOSE):

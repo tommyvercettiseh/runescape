@@ -374,7 +374,7 @@
   "Tile_Fire.png": {
     "method": "TM_CCOEFF",
     "min_shape": 95.0,
-    "min_color": 90.0,
+    "min_color": 80.0,
     "area": "Bot_Area"
   },
   "Item_Tinderbox.png": {
@@ -390,9 +390,9 @@
     "area": "Inventory_Area"
   },
   "Firemaking_Continue.png": {
-    "method": "TM_CCOEFF_NORMED",
+    "method": "TM_SQDIFF_NORMED",
     "min_shape": 90.0,
-    "min_color": 10.0,
+    "min_color": 50.0,
     "area": "Chat_Area"
   },
   "Action_Attack.png": {
@@ -550,5 +550,71 @@
     "min_shape": 95.0,
     "min_color": 91.0,
     "area": "Tab_Confirmation_Area"
+  },
+  "Box_Trap_Text.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 80.0,
+    "area": "Bot_Area"
+  },
+  "Box_Trap_Dashes.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 85.0,
+    "area": "Bot_Area"
+  },
+  "Box_Trap_Inventory.png": {
+    "method": "TM_CCOEFF",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Box_Trap_Dashes_Combi.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 80.0,
+    "area": "Bot_Area"
+  },
+  "Box_Trap_Lay.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 95.0,
+    "area": "Bot_Area_Full"
+  },
+  "Notification_Random_Event.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Chat_Area"
+  },
+  "Notification_ThisTrapIsntYours.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Chat_Area"
+  },
+  "Item_Snape_Grass.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 85.0,
+    "area": "Inventory_Area"
+  },
+  "Item_Ranarr_Potion.png": {
+    "method": "ALL",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
+  },
+  "Herblore_Potion_Continue.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 90.0,
+    "min_color": 90.0,
+    "area": "Chat_Area"
+  },
+  "Continue_All.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 95.0,
+    "min_color": 95.0,
+    "area": "Chat_Area"
   }
 }

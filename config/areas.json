@@ -118,10 +118,10 @@
   },
   "NieuwGebied_1": {
     "coords": [
-      100,
-      100,
-      200,
-      200
+      257,
+      162,
+      357,
+      262
     ],
     "group": "default"
   },
@@ -181,10 +181,10 @@
   },
   "NieuwGebied_2": {
     "coords": [
-      100,
-      100,
-      200,
-      200
+      205,
+      185,
+      305,
+      285
     ],
     "group": "default"
   },
@@ -460,10 +460,10 @@
   },
   "Attack": {
     "coords": [
-      627,
-      232,
-      690,
-      265
+      629,
+      233,
+      692,
+      266
     ],
     "group": "Skilling"
   },
@@ -502,5 +502,50 @@
       224
     ],
     "group": "Settings"
+  },
+  "Offscreen": {
+    "coords": [
+      243,
+      682,
+      1856,
+      914
+    ],
+    "group": "default"
+  },
+  "Map_Area": {
+    "coords": [
+      669,
+      70,
+      779,
+      150
+    ],
+    "group": "Basic"
+  },
+  "Map_Area_Nearby": {
+    "coords": [
+      696,
+      90,
+      752,
+      133
+    ],
+    "group": "Basic"
+  },
+  "Hunter": {
+    "coords": [
+      691,
+      442,
+      754,
+      475
+    ],
+    "group": "Skilling"
+  },
+  "Herblore": {
+    "coords": [
+      695,
+      295,
+      747,
+      322
+    ],
+    "group": "Skilling"
   }
 }

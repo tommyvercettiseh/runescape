@@ -14,7 +14,7 @@
     "4": ""
   },
   "active_1": true,
-  "script_1": "smithing.py",
+  "script_1": "prayer_potion.py",
   "item_pick_1": "Item_FlyFishingRod.png",
   "item_query_1": "",
   "active_2": false,
@@ -29,7 +29,7 @@
   "script_4": "smithing.py",
   "item_pick_4": "Item_Axe.png",
   "item_query_4": "",
-  "runtime_hours": 18,
+  "runtime_hours": 9,
   "runtime_minutes": 0,
   "loop_mode": 2,
   "delay_seconds": 0

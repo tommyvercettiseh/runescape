@@ -1,463 +1,222 @@
-﻿from __future__ import annotations
+﻿# core/ai_cursor_movement.py
+from __future__ import annotations
 
-# ============================================================
-# BOOTSTRAP
-# ============================================================
-import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]  # .../Runescape
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-# ============================================================
-# IMPORTS
-# ============================================================
-import time
-import random
-import math
-import ctypes
-import importlib
 from dataclasses import dataclass
-from typing import Tuple, List
-
-from config.areas import load_coords
-from core.bot_offsets import apply_offset
+from typing import Callable, Iterable, List, Optional, Sequence, Tuple
+import math
+import random
 
 Point = Tuple[int, int]
-Bounds = Tuple[int, int, int, int]
+Bounds = Tuple[int, int, int, int]  # x1,y1,x2,y2
 
-"""
-High-refresh tuning notes:
-- For 144 Hz, target tick ~= 6.94 ms.
-- Keep tick variation minimal; move "humanity" into trajectory, not timing.
-"""
 
 # ============================================================
-# TWEAKS
+# Config
 # ============================================================
-USE_VIRTUAL_BOUNDS = True
-MAX_DURATION_PER_MOVE = 1.65
-
-TARGET_HZ = 144.0
-TARGET_TICK = 1.0 / TARGET_HZ  # ~0.00694s
-TICK_MIN = 0.0058
-TICK_MAX = 0.0082
-
-SPEED_MIN_PX_S = 700
-SPEED_MAX_PX_S = 1500
-SPEED_JITTER = 0.10
-
-SLOW_CHANCE = 0.30
-SLOW_MULT = 0.80
-
-MAX_STEP_PX = 26
-
-BEND_MAX = 55.0
-BEND_FACTOR = 0.10
-
-DRIFT_SCALE = 0.0012
-DRIFT_MIN = 0.08
-DRIFT_MAX = 0.95
-DRIFT_FREQ_MIN = 0.95
-DRIFT_FREQ_MAX = 1.25
-# ============================================================
-
 
 @dataclass(frozen=True)
 class CursorMotionConfig:
-    duration: float = 0.35
+    # timing
+    duration: float = 0.22          # seconds
     fps: int = 120
-    min_duration: float = 0.08
+
+    # step safety
     min_steps: int = 12
+    min_duration: float = 0.06
+
+    # motor feel
+    overshoot_chance: float = 0.22
+    overshoot_px_mean: float = 9.0
+    overshoot_px_sd: float = 5.0
+
+    micro_jitter_px: float = 0.55   # 0..2-ish
+    endpoint_settle_ms: int = 28    # small finishing settle
+
+    # noise shaping
+    tremor_strength: float = 0.10   # 0..0.3
+    fatigue_strength: float = 0.0   # 0..1 external, shifts speed + jitter
 
 
-@dataclass(frozen=True)
-class PlannedStep:
-    x: int
-    y: int
-    sleep_s: float
+# ============================================================
+# Helpers
+# ============================================================
+
+def clamp(n: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, n))
 
 
-def _ease_in_out_quad(t: float) -> float:
-    return 2 * t * t if t < 0.5 else 1 - ((-2 * t + 2) ** 2) / 2
+def clamp_point(p: Point, b: Bounds) -> Point:
+    x1, y1, x2, y2 = b
+    return (int(clamp(p[0], x1, x2)), int(clamp(p[1], y1, y2)))
 
 
-def _clamp(v: float, lo: float, hi: float) -> float:
-    return lo if v < lo else hi if v > hi else v
+def dist(a: Point, b: Point) -> float:
+    return math.hypot(b[0] - a[0], b[1] - a[1])
 
 
-def _scale_sleep(sleep_s: float, speed_pct: float) -> float:
-    try:
-        sp = float(speed_pct)
-    except Exception:
-        sp = 100.0
-
-    if sp <= 0:
-        sp = 1.0
-
-    factor = 100.0 / sp
-    return float(sleep_s) * factor
+def lerp(a: float, b: float, t: float) -> float:
+    return a + (b - a) * t
 
 
-def get_virtual_screen_bounds() -> Bounds:
-    user32 = ctypes.windll.user32
-    SM_XVIRTUALSCREEN = 76
-    SM_YVIRTUALSCREEN = 77
-    SM_CXVIRTUALSCREEN = 78
-    SM_CYVIRTUALSCREEN = 79
-
-    x1 = int(user32.GetSystemMetrics(SM_XVIRTUALSCREEN))
-    y1 = int(user32.GetSystemMetrics(SM_YVIRTUALSCREEN))
-    w = int(user32.GetSystemMetrics(SM_CXVIRTUALSCREEN))
-    h = int(user32.GetSystemMetrics(SM_CYVIRTUALSCREEN))
-    return (x1, y1, x1 + w, y1 + h)
+def smoothstep(t: float) -> float:
+    # nice accel and decel, 0..1
+    t = clamp(t, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
 
 
-def get_primary_bounds() -> Bounds:
-    user32 = ctypes.windll.user32
-    w = int(user32.GetSystemMetrics(0))
-    h = int(user32.GetSystemMetrics(1))
-    return (0, 0, w, h)
+def ease_in_out_sine(t: float) -> float:
+    t = clamp(t, 0.0, 1.0)
+    return 0.5 - 0.5 * math.cos(math.pi * t)
 
 
-def get_default_bounds() -> Bounds:
-    return get_virtual_screen_bounds() if USE_VIRTUAL_BOUNDS else get_primary_bounds()
+def _randn(mean: float, sd: float) -> float:
+    # gaussian
+    return random.gauss(mean, sd)
 
 
-def clamp_point(p: Point, bounds: Bounds) -> Point:
-    x, y = int(p[0]), int(p[1])
-    x1, y1, x2, y2 = bounds
-    x = max(x1, min(x, x2 - 1))
-    y = max(y1, min(y, y2 - 1))
+def _unit_vec(a: Point, b: Point) -> Tuple[float, float]:
+    dx = b[0] - a[0]
+    dy = b[1] - a[1]
+    d = math.hypot(dx, dy) or 1.0
+    return (dx / d, dy / d)
+
+
+def _perp(u: Tuple[float, float]) -> Tuple[float, float]:
+    return (-u[1], u[0])
+
+
+def _bezier(p0, p1, p2, p3, t: float) -> Tuple[float, float]:
+    # cubic bezier
+    u = 1.0 - t
+    tt = t * t
+    uu = u * u
+    uuu = uu * u
+    ttt = tt * t
+    x = uuu * p0[0] + 3 * uu * t * p1[0] + 3 * u * tt * p2[0] + ttt * p3[0]
+    y = uuu * p0[1] + 3 * uu * t * p1[1] + 3 * u * tt * p2[1] + ttt * p3[1]
     return (x, y)
 
 
-def _bezier2(p0: Point, p1: Tuple[float, float], p2: Point, t: float) -> Tuple[float, float]:
-    inv = 1.0 - t
-    x = inv * inv * p0[0] + 2 * inv * t * p1[0] + t * t * p2[0]
-    y = inv * inv * p0[1] + 2 * inv * t * p1[1] + t * t * p2[1]
-    return x, y
-
-
-def _pick_tick(cluster: float | None = None) -> float:
-    """
-    Frame-locked tick near 1/144s.
-    For 144 Hz motion quality we keep dt stable; smoothness comes from trajectory,
-    not timing noise.
-    """
-    if cluster is None:
-        cluster = TARGET_TICK
-    return _clamp(float(cluster), TICK_MIN, TICK_MAX)
-
-
-def _speed_for_dist(dist: float) -> float:
-    k = 1.0 - math.exp(-dist / 550.0)
-    speed = SPEED_MIN_PX_S + (SPEED_MAX_PX_S - SPEED_MIN_PX_S) * k
-    speed *= random.uniform(1.0 - SPEED_JITTER, 1.0 + SPEED_JITTER)
-    if random.random() < SLOW_CHANCE:
-        speed *= SLOW_MULT
-    return max(250.0, speed)
-
+# ============================================================
+# Planning
+# ============================================================
 
 def plan_move(
-    start_pos: Point,
-    target_pos: Point,
+    start: Point,
+    target: Point,
+    motion: CursorMotionConfig,
     *,
-    config: CursorMotionConfig = CursorMotionConfig(),
-    bounds: Bounds | None = None,
-    speed_pct: float = 100.0,
-) -> List[PlannedStep]:
-    if bounds is None:
-        bounds = get_default_bounds()
+    bounds: Optional[Bounds] = None,
+    rng: Optional[random.Random] = None,
+) -> List[Point]:
+    """
+    Returns list of integer points along a human-ish trajectory.
+    This module does NOT move the cursor. Only plans a path.
+    """
+    r = rng or random
+    p0 = (float(start[0]), float(start[1]))
+    p3 = (float(target[0]), float(target[1]))
 
-    x2, y2 = clamp_point(target_pos, bounds)
-    x1, y1 = clamp_point(start_pos, bounds)
+    duration = max(float(motion.min_duration), float(motion.duration))
+    fps = max(30, int(motion.fps))
+    steps = max(int(motion.min_steps), int(duration * fps))
 
-    dx = x2 - x1
-    dy = y2 - y1
-    dist = math.hypot(dx, dy)
+    # fatigue shifts: more jitter + slightly slower profile
+    fatigue = clamp(float(motion.fatigue_strength), 0.0, 1.0)
+    jitter = float(motion.micro_jitter_px) * (1.0 + 0.85 * fatigue)
 
-    if dist <= 1.0:
-        return [PlannedStep(x=x2, y=y2, sleep_s=0.0)]
-    # micro moves: direct, no planner feel (smooth at 144 Hz)
-    if dist < 8.0:
-        sleep_s = TARGET_TICK
-        return [PlannedStep(x=x2, y=y2, sleep_s=_scale_sleep(sleep_s, speed_pct))]
+    # direction + distance
+    d = dist(start, target)
+    u = _unit_vec(start, target)
+    v = _perp(u)
 
-    speed = _speed_for_dist(dist)
-    duration = dist / speed
-    duration = _clamp(duration, float(config.min_duration), float(MAX_DURATION_PER_MOVE))
+    # control points
+    # lateral deviation grows with distance but saturates
+    lateral = clamp(_randn(0.0, 1.0), -2.0, 2.0) * clamp(d / 120.0, 0.25, 1.8) * 10.0
+    along1 = clamp(d * r.uniform(0.20, 0.38), 10.0, 420.0)
+    along2 = clamp(d * r.uniform(0.58, 0.80), 20.0, 520.0)
 
-    tick = _pick_tick(TARGET_TICK)
-    steps = max(int(duration / tick), int(config.min_steps))
-    steps = min(steps, int(MAX_DURATION_PER_MOVE / TICK_MIN))
+    p1 = (p0[0] + u[0] * along1 + v[0] * lateral,
+          p0[1] + u[1] * along1 + v[1] * lateral)
 
-    min_steps_for_cap = int(math.ceil(dist / MAX_STEP_PX))
-    steps = max(steps, min_steps_for_cap)
+    p2 = (p0[0] + u[0] * along2 + v[0] * (-lateral * r.uniform(0.65, 1.25)),
+          p0[1] + u[1] * along2 + v[1] * (-lateral * r.uniform(0.65, 1.25)))
 
-    if dist < 90:
-        cx = x1 + dx * 0.5
-        cy = y1 + dy * 0.5
+    # optional overshoot: create a slightly past target endpoint, then correction later
+    do_overshoot = (r.random() < float(motion.overshoot_chance)) and d > 35
+    if do_overshoot:
+        ov = max(0.0, _randn(float(motion.overshoot_px_mean), float(motion.overshoot_px_sd)))
+        ov = clamp(ov, 2.0, 45.0)
+        p3_os = (p3[0] + u[0] * ov, p3[1] + u[1] * ov)
+        main_path = _sample_bezier(p0, p1, p2, p3_os, steps, jitter=jitter, tremor=float(motion.tremor_strength))
+        # correction mini-path
+        corr_steps = max(8, int(steps * r.uniform(0.10, 0.22)))
+        corr = _sample_bezier(
+            (float(main_path[-1][0]), float(main_path[-1][1])),
+            (p3_os[0] + v[0] * r.uniform(-3, 3), p3_os[1] + v[1] * r.uniform(-3, 3)),
+            (p3[0] + v[0] * r.uniform(-2, 2), p3[1] + v[1] * r.uniform(-2, 2)),
+            p3,
+            corr_steps,
+            jitter=jitter * 0.55,
+            tremor=float(motion.tremor_strength) * 0.6,
+        )
+        pts = main_path + corr
     else:
-        nxp = -dy / dist
-        nyp = dx / dist
-        bend = random.uniform(-1.0, 1.0) * min(BEND_MAX, dist * BEND_FACTOR)
-        cx = x1 + dx * random.uniform(0.42, 0.58) + nxp * bend
-        cy = y1 + dy * random.uniform(0.42, 0.58) + nyp * bend
+        pts = _sample_bezier(p0, p1, p2, p3, steps, jitter=jitter, tremor=float(motion.tremor_strength))
 
-    p0 = (x1, y1)
-    p1 = (cx, cy)
-    p2 = (x2, y2)
+    # clamp + de-dupe
+    out: List[Point] = []
+    last = None
+    for x, y in pts:
+        pi = (int(round(x)), int(round(y)))
+        if bounds is not None:
+            pi = clamp_point(pi, bounds)
+        if last != pi:
+            out.append(pi)
+            last = pi
 
-    nx = -dy / dist
-    ny = dx / dist
-    amp = _clamp(dist * DRIFT_SCALE, DRIFT_MIN, DRIFT_MAX) * random.uniform(0.85, 1.10)
-    phase = random.uniform(0.0, math.tau)
-    freq = random.uniform(DRIFT_FREQ_MIN, DRIFT_FREQ_MAX)
+    # ensure ends at exact target
+    if out and out[-1] != (int(target[0]), int(target[1])):
+        out.append((int(target[0]), int(target[1])))
 
-    fx, fy = float(x1), float(y1)
-    planned: List[PlannedStep] = []
-
-    # Fixed tick timing for smooth high-refresh rendering.
-    cluster = TARGET_TICK
-    base_sleep = _pick_tick(cluster)
-
-    # Subpixel accumulator to avoid "same pixel for N frames then jump" aliasing.
-    last_fx, last_fy = float(x1), float(y1)
-    ix, iy = int(x1), int(y1)
-    err_x = 0.0
-    err_y = 0.0
-
-    for i in range(1, steps + 1):
-        t = i / steps
-        s = _ease_in_out_quad(t)
-
-        tx, ty = _bezier2(p0, p1, p2, s)
-
-        decay = 1.0 - s
-        drift = math.sin(phase + s * math.tau * freq) * amp * decay
-        tx += nx * drift
-        ty += ny * drift
-
-        ddx = tx - fx
-        ddy = ty - fy
-        step_len = math.hypot(ddx, ddy)
-
-        if step_len > MAX_STEP_PX and step_len > 0.0001:
-            k = MAX_STEP_PX / step_len
-            fx += ddx * k
-            fy += ddy * k
-        else:
-            fx, fy = tx, ty
-
-        # Convert float movement to integer pixels with error feedback.
-        dfx = fx - last_fx
-        dfy = fy - last_fy
-        cx = dfx + err_x
-        cy = dfy + err_y
-        dx_i = int(round(cx))
-        dy_i = int(round(cy))
-        err_x = cx - dx_i
-        err_y = cy - dy_i
-
-        nx_i, ny_i = ix + dx_i, iy + dy_i
-        xi, yi = clamp_point((nx_i, ny_i), bounds)
-
-        # If clamped, drop accumulated error for that axis to avoid fighting bounds.
-        if xi != nx_i:
-            err_x = 0.0
-        if yi != ny_i:
-            err_y = 0.0
-
-        ix, iy = xi, yi
-        last_fx, last_fy = fx, fy
-
-        sleep_s = _scale_sleep(base_sleep, speed_pct)
-        planned.append(PlannedStep(x=xi, y=yi, sleep_s=sleep_s))
-
-    curx, cury = planned[-1].x, planned[-1].y
-    for _ in range(10):
-        ddx = x2 - curx
-        ddy = y2 - cury
-        r = math.hypot(ddx, ddy)
-        if r <= 1.3:
-            break
-        k = min(1.0, MAX_STEP_PX / max(1.0, r))
-        curx = int(curx + ddx * k)
-        cury = int(cury + ddy * k)
-        curx, cury = clamp_point((curx, cury), bounds)
-        base_sleep = _pick_tick(cluster)
-        sleep_s = _scale_sleep(base_sleep, speed_pct)
-        planned.append(PlannedStep(x=curx, y=cury, sleep_s=sleep_s))
-
-    return planned
+    return out
 
 
-# ============================================================
-# RANDOM MOUSE MOVEMENT (AREA BASED, NO TELEPORT START)
-# ============================================================
-def random_mouse_movements(
-    min_sec,
-    max_sec,
-    area_name,
+def _sample_bezier(
+    p0: Tuple[float, float],
+    p1: Tuple[float, float],
+    p2: Tuple[float, float],
+    p3: Tuple[float, float],
+    steps: int,
     *,
-    bot_id=1,
-    padding=6,
-    verbose=False,
+    jitter: float,
+    tremor: float,
+) -> List[Tuple[float, float]]:
+    pts: List[Tuple[float, float]] = []
+    steps = max(2, int(steps))
 
-    # ✅ feel settings
-    fps=120,                 # fps blijft altijd hetzelfde
-    speed_min=65.0,          # % speed range (lager = trager)
-    speed_max=165.0,         # % speed range (hoger = sneller)
-    slow_chance=0.22,        # kans op "langzaam moment"
-    slow_mult=0.55,          # maakt speed tijdelijk lager
-    fast_chance=0.18,        # kans op "sneller moment"
-    fast_mult=1.35,          # maakt speed tijdelijk hoger
+    for i in range(steps):
+        t = i / (steps - 1)
 
-    # ✅ segment timing (wordt nog dynamisch gecorrigeerd)
-    seg_min=0.12,
-    seg_max=0.70,
+        # human-ish speed curve: sine ease with tiny irregularity
+        base = ease_in_out_sine(t)
+        wobble = (random.random() - 0.5) * 0.018
+        t2 = clamp(base + wobble, 0.0, 1.0)
 
-    # ✅ pause feel (micro pauses)
-    pause_min=0.01,
-    pause_max=0.08,
+        x, y = _bezier(p0, p1, p2, p3, t2)
 
-    enter_first=True,
-) -> bool:
-    """
-    Random mouse movement binnen area voor min_sec..max_sec seconden.
-    Dynamischer: speed varieert per segment, fps blijft constant, blijft smooth.
-    """
+        # micro jitter fades towards endpoint
+        fade = 1.0 - smoothstep(t)
+        j = jitter * fade
+        x += (random.random() - 0.5) * 2.0 * j
+        y += (random.random() - 0.5) * 2.0 * j
 
-    ai = importlib.import_module("core.ai_cursor")
-    move_cursor = ai.move_cursor
+        # tremor is tiny oscillation, not full randomness
+        if tremor > 0.0:
+            trem = tremor * fade
+            x += math.sin(t * math.pi * 6.0) * trem * 2.0
+            y += math.cos(t * math.pi * 5.0) * trem * 2.0
 
-    try:
-        coords = list(load_coords(area_name))
-    except Exception:
-        if verbose:
-            print(f"❌ random_mouse_movement: area '{area_name}' niet gevonden via load_coords()")
-        return False
+        pts.append((x, y))
 
-    x1, y1, x2, y2 = apply_offset(coords, int(bot_id))
-
-    pad = max(0, int(padding))
-    left = int(x1 + pad)
-    top = int(y1 + pad)
-    right = int(x2 - pad - 1)
-    bottom = int(y2 - pad - 1)
-
-    if right <= left or bottom <= top:
-        if verbose:
-            print("❌ random_mouse_movement: area te klein na padding")
-        return False
-
-    bounds = (left, top, right + 1, bottom + 1)
-
-    total = random.uniform(float(min_sec), float(max_sec))
-    end_t = time.time() + total
-
-    if verbose:
-        print(f"🌀 Random mouse movement '{area_name}' bot={bot_id} ~{total:.2f}s fps={fps}")
-
-    # ------------------------------------------------------------
-    # helpers: dynamische speed & segment durations (smooth)
-    # ------------------------------------------------------------
-    def _pick_speed():
-        sp = random.uniform(float(speed_min), float(speed_max))
-
-        r = random.random()
-        if r < float(slow_chance):
-            sp *= float(slow_mult)
-        elif r > 1.0 - float(fast_chance):
-            sp *= float(fast_mult)
-
-        # cap safe
-        return max(20.0, min(sp, 240.0))
-
-    def _seg_duration(speed_pct):
-        """
-        Sneller = kortere duration.
-        Trager = langere duration.
-        """
-        base = random.uniform(float(seg_min), float(seg_max))
-
-        # speed influence (100% ~ neutraal)
-        if speed_pct >= 100:
-            base *= random.uniform(0.65, 0.95)
-        else:
-            base *= random.uniform(1.05, 1.55)
-
-        # af en toe een "slow sweep"
-        if random.random() < 0.14:
-            base *= random.uniform(1.15, 1.90)
-
-        return max(0.10, min(base, 1.25))
-
-    # ------------------------------------------------------------
-    # enter area first (voorkomt teleport clamp-start)
-    # ------------------------------------------------------------
-    if enter_first:
-        entry_x = random.randint(left, right)
-        entry_y = random.randint(top, bottom)
-
-        entry_speed = _pick_speed()
-        entry_dur = max(0.35, _seg_duration(entry_speed))
-
-        entry_motion = CursorMotionConfig(duration=float(entry_dur), fps=int(fps))
-
-        move_cursor(
-            (entry_x, entry_y),
-            config=entry_motion,
-            bounds=None,  # 🔥 belangrijk
-            speed_pct=float(entry_speed),
-        )
-
-    # ------------------------------------------------------------
-    # main wander loop
-    # ------------------------------------------------------------
-    moves = 0
-    while time.time() < end_t:
-        remaining = end_t - time.time()
-        if remaining <= 0:
-            break
-
-        tx = random.randint(left, right)
-        ty = random.randint(top, bottom)
-
-        sp = _pick_speed()
-        dur = _seg_duration(sp)
-
-        # niet te lang als we bijna klaar zijn
-        if remaining < 0.25:
-            dur = min(dur, remaining)
-
-        motion = CursorMotionConfig(duration=float(dur), fps=int(fps))
-
-        move_cursor(
-            (tx, ty),
-            config=motion,
-            bounds=bounds,
-            speed_pct=float(sp),
-        )
-
-        moves += 1
-
-        # micro pause (niet altijd, anders voelt het "scripted")
-        if pause_max > 0:
-            if random.random() < 0.85:
-                time.sleep(random.uniform(float(pause_min), float(pause_max)))
-
-    if verbose:
-        print(f"✅ random_mouse_movement done ({moves} moves)")
-
-    return True
-
-# ============================================================
-# SELF TEST
-# ============================================================
-if __name__ == "__main__":
-    VERBOSE = True
-    ok = random_mouse_movement(1, 4, "Bot_Area_Full", bot_id=1, verbose=VERBOSE)
-    print(f"🧪 Test klaar | success={ok}")
+    return pts

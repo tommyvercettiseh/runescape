@@ -1,0 +1,104 @@
+{
+  "date": "2026-02-12",
+  "bot_id": 1,
+  "budget_sec": 28800.0,
+  "used_sec": 12379.977052,
+  "fatigue": 0.4298603143183099,
+  "battery": 0.57013968568169,
+  "updated_at": "2026-02-13T07:05:53",
+  "sessions": [
+    {
+      "start_ts": 1770924716.988549,
+      "end_ts": 1770924935.815521,
+      "sec": 218.826971,
+      "reason": "stop_bot",
+      "meta": {
+        "source": "bot_manager",
+        "script": "hunting_chinchompas.py",
+        "pid": 5272,
+        "rc": 1
+      }
+    },
+    {
+      "start_ts": 1770925037.69985,
+      "end_ts": 1770928787.151449,
+      "sec": 3749.451599,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "hunting_chinchompas.py",
+        "pid": 2124,
+        "rc": 1
+      }
+    },
+    {
+      "start_ts": 1770928787.340495,
+      "end_ts": 1770928790.176402,
+      "sec": 2.835907,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "hunting_chinchompas.py",
+        "pid": 4648,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770928790.352075,
+      "end_ts": 1770928791.788183,
+      "sec": 1.436108,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "hunting_chinchompas.py",
+        "pid": 11568,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770928791.964211,
+      "end_ts": 1770928793.396978,
+      "sec": 1.432766,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "hunting_chinchompas.py",
+        "pid": 8484,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770928793.571208,
+      "end_ts": 1770928795.253275,
+      "sec": 1.682068,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "hunting_chinchompas.py",
+        "pid": 13464,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770928795.507318,
+      "end_ts": 1770928797.141643,
+      "sec": 1.634326,
+      "reason": "process_exit",
+      "meta": {
+        "source": "bot_manager",
+        "script": "hunting_chinchompas.py",
+        "pid": 5472,
+        "rc": 0
+      }
+    },
+    {
+      "start_ts": 1770928797.322693,
+      "end_ts": 1770937200.0,
+      "sec": 8402.677307,
+      "reason": "recovered_overlap",
+      "meta": {
+        "recovered": true
+      }
+    }
+  ]
+}

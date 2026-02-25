@@ -39,7 +39,7 @@ def assist_target(
     center_bias=0.18,
     jitter_range=0,
     dilate_px=2,
-    deep_erode_px=6,
+    deep_erode_px=15,
     mode="deep_random",
 
     verbose=True,

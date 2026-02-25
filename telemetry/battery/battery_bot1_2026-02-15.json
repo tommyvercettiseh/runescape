@@ -1,0 +1,44 @@
+{
+  "date": "2026-02-15",
+  "bot_id": 1,
+  "budget_sec": 28800.0,
+  "used_sec": 35411.626193,
+  "fatigue": 1.0,
+  "battery": 0.0,
+  "updated_at": "2026-02-16T17:26:17",
+  "sessions": [
+    {
+      "start_ts": 1771146940.553398,
+      "end_ts": 1771149204.323338,
+      "sec": 2263.76994,
+      "reason": "stop_bot",
+      "meta": {
+        "source": "bot_manager",
+        "script": "hunting_chinchompas.py",
+        "pid": 5016,
+        "rc": 1
+      }
+    },
+    {
+      "start_ts": 1771163241.195586,
+      "end_ts": 1771163253.583771,
+      "sec": 12.388186,
+      "reason": "stop_bot",
+      "meta": {
+        "source": "bot_manager",
+        "script": "hunting_chinchompas.py",
+        "pid": 13400,
+        "rc": 1
+      }
+    },
+    {
+      "start_ts": 1771163264.531933,
+      "end_ts": 1771196400.0,
+      "sec": 33135.468067,
+      "reason": "recovered_overlap",
+      "meta": {
+        "recovered": true
+      }
+    }
+  ]
+}

@@ -12,133 +12,23 @@ keyboard = Controller()
 # =========================
 # === TIMING RANGES ======
 # =========================
-PRESS_DELAY_RANGE = (0.015, 0.045)     # korte tik
-HOLD_DELAY_RANGE  = (0.18, 0.35)       # normale hold
-TYPE_INTERVAL_RANGE = (0.025, 0.055)   # typen
+PRESS_DELAY_RANGE = (0.015, 0.045)
+HOLD_DELAY_RANGE = (0.18, 0.35)
+TYPE_INTERVAL_RANGE = (0.025, 0.055)
 
 def _rand_range(rng):
     return random.uniform(rng[0], rng[1])
 
 # =========================
-# === BASIC KEY ACTIONS ==
+# === KEY RESOLVE ========
 # =========================
-def press_key(key, delay=None):
-    k = _resolve_key(key)
-    keyboard.press(k)
-
-    if delay is None:
-        time.sleep(_rand_range(PRESS_DELAY_RANGE))
-    else:
-        time.sleep(float(delay))
-
-    keyboard.release(k)
-
-
-def hold_key(key, hold_time=None):
-    k = _resolve_key(key)
-    keyboard.press(k)
-
-    if hold_time is None:
-        time.sleep(_rand_range(HOLD_DELAY_RANGE))
-    else:
-        time.sleep(float(hold_time))
-
-    keyboard.release(k)
-
-
-def hold_key_range(key, min_sec, max_sec):
-    hold_key(key, random.uniform(min_sec, max_sec))
-
-
-def type_text(text, interval=None):
-    for ch in text:
-        keyboard.type(ch)
-        if interval is None:
-            time.sleep(_rand_range(TYPE_INTERVAL_RANGE))
-        else:
-            time.sleep(float(interval))
-
-
-# =========================
-# === HUMAN TYPE TEXT ====
-# =========================
-_NEIGHBORS = {
-    "a": "qwsz", "b": "vghn", "c": "xdfv", "d": "ersfcx", "e": "wsdr",
-    "f": "rtgdvc", "g": "tyfhvb", "h": "yugjbn", "i": "ujko",
-    "j": "uikhmn", "k": "ijolm", "l": "kop", "m": "njk",
-    "n": "bhjm", "o": "iklp", "p": "ol", "q": "wa", "r": "edft",
-    "s": "wedxza", "t": "rfgy", "u": "yhji", "v": "cfgb",
-    "w": "qase", "x": "zsdc", "y": "tghu", "z": "asx",
-}
-
-def type_text_human(
-    text,
-    *,
-    base_interval=0.08,
-    jitter=0.05,
-    pause_chance=0.08,
-    pause_range=(0.15, 0.55),
-    mistake_chance=0.03,
-    correct_chance=0.85,
-    extra_char_chance=0.01,
-):
-    for ch in text:
-        _sleep_human(base_interval, jitter)
-
-        if random.random() < pause_chance:
-            time.sleep(random.uniform(*pause_range))
-
-        if ch == "\n":
-            press_key("enter")
-            continue
-
-        if _is_typable_letter(ch) and random.random() < mistake_chance:
-            wrong = _make_mistake(ch)
-            keyboard.type(wrong)
-            _sleep_human(base_interval * 0.8, jitter)
-
-            if random.random() < extra_char_chance:
-                keyboard.type(_make_mistake(ch))
-                _sleep_human(base_interval * 0.7, jitter)
-
-            if random.random() < correct_chance:
-                press_key("backspace")
-                if random.random() < 0.35:
-                    press_key("backspace")
-                _sleep_human(base_interval * 0.9, jitter)
-                keyboard.type(ch)
-            continue
-
-        keyboard.type(ch)
-
-
-# =========================
-# === INTERNAL HELPERS ===
-# =========================
-def _sleep_human(base, jitter):
-    t = max(0.0, base + random.uniform(-jitter, jitter))
-    time.sleep(t)
-
-
-def _is_typable_letter(ch):
-    return len(ch) == 1 and ch.lower() in _NEIGHBORS and ch.isalpha()
-
-
-def _make_mistake(ch):
-    lower = ch.lower()
-    options = _NEIGHBORS.get(lower, lower)
-    wrong = random.choice(options)
-    return wrong.upper() if ch.isupper() else wrong
-
-
 def _resolve_key(key):
+
     if isinstance(key, Key):
         return key
 
-    k = str(key).lower()
     special = {
         "esc": Key.esc,
-        "escape": Key.esc,
         "enter": Key.enter,
         "tab": Key.tab,
         "space": Key.space,
@@ -152,26 +42,182 @@ def _resolve_key(key):
         "left": Key.left,
         "right": Key.right,
     }
-    return special.get(k, key)
 
+    return special.get(str(key).lower(), key)
+
+# =========================
+# === BASIC KEY ACTIONS ==
+# =========================
+def press_key(key, delay=None):
+    k = _resolve_key(key)
+    keyboard.press(k)
+    time.sleep(float(delay) if delay else _rand_range(PRESS_DELAY_RANGE))
+    keyboard.release(k)
+
+def hold_key(key, hold_time=None):
+    k = _resolve_key(key)
+    keyboard.press(k)
+    time.sleep(float(hold_time) if hold_time else _rand_range(HOLD_DELAY_RANGE))
+    keyboard.release(k)
+
+def hold_key_range(key, min_sec, max_sec):
+    hold_key(key, random.uniform(min_sec, max_sec))
+
+# =========================
+# === HUMAN TYPE ENGINE ==
+# =========================
+_NEIGHBORS = {
+    "a": "qwsz", "b": "vghn", "c": "xdfv", "d": "ersfcx",
+    "e": "wsdr", "f": "rtgdvc", "g": "tyfhvb", "h": "yugjbn",
+    "i": "ujko", "j": "uikhmn", "k": "ijolm", "l": "kop",
+    "m": "njk", "n": "bhjm", "o": "iklp", "p": "ol",
+    "q": "wa", "r": "edft", "s": "wedxza", "t": "rfgy",
+    "u": "yhji", "v": "cfgb", "w": "qase", "x": "zsdc",
+    "y": "tghu", "z": "asx",
+}
+
+def _sleep_human(base=0.08, jitter=0.05):
+    time.sleep(max(0.0, base + random.uniform(-jitter, jitter)))
+
+def _is_letter(ch):
+    return len(ch) == 1 and ch.lower() in _NEIGHBORS and ch.isalpha()
+
+def _mistake(ch):
+    options = _NEIGHBORS.get(ch.lower(), ch.lower())
+    wrong = random.choice(options)
+    return wrong.upper() if ch.isupper() else wrong
+
+def _type_human(text):
+    for ch in text:
+
+        _sleep_human()
+
+        if random.random() < 0.08:
+            time.sleep(random.uniform(0.15, 0.55))
+
+        if ch == "\n":
+            press_key("enter")
+            continue
+
+        if _is_letter(ch) and random.random() < 0.03:
+            wrong = _mistake(ch)
+            keyboard.type(wrong)
+            _sleep_human(0.06, 0.04)
+
+            if random.random() < 0.85:
+                press_key("backspace")
+                _sleep_human(0.07, 0.03)
+                keyboard.type(ch)
+            continue
+
+        keyboard.type(ch)
+
+# =========================
+# === MAIN TYPE FUNCTION ==
+# =========================
+def type_text(
+    *parts,
+    human=True,
+    enter=False,
+    sep=" ",
+    pick_random=True,
+    join=False,
+    force_lower=True,
+):
+    """
+    Standaard:
+        type_text("sup", "i'll hop")   -> kiest random één van deze
+        type_text("yo")               -> typt "yo"
+
+    Alles samen typen:
+        type_text("sup", "i'll hop", join=True) -> "sup i'll hop"
+    """
+
+    if not parts:
+        return False
+
+    cleaned = [str(p) for p in parts if p is not None and str(p).strip() != ""]
+    if not cleaned:
+        return False
+
+    if join:
+        text = sep.join(cleaned)
+    else:
+        text = random.choice(cleaned) if (pick_random and len(cleaned) > 1) else cleaned[0]
+
+    if force_lower:
+        text = text.lower()
+
+    if human:
+        _type_human(text)
+    else:
+        for ch in text:
+            keyboard.type(ch)
+            time.sleep(_rand_range(TYPE_INTERVAL_RANGE))
+
+    if enter:
+        press_key("enter")
+
+    return text
+
+# =========================
+# === RANDOM PHRASES =====
+# =========================
+PHASE_1 = [
+    "sup", "what up", "yo", "you good", "all good?",
+    "u there?", "hey", "hi", "still on?", "ready?"
+]
+
+PHASE_2 = [
+    "yeah im good", "all smooth", "lol", "nice",
+    "true", "no worries", "just grinding", "solid"
+]
+
+PHASE_1 = [p.lower() for p in PHASE_1]
+PHASE_2 = [p.lower() for p in PHASE_2]
+
+_LAST_PICK = {"phase1": None, "phase2": None}
+
+def type_random_phrase(phase=1, human=True, enter=True, avoid_repeat=True):
+
+    if phase == 1:
+        lines = PHASE_1
+        key = "phase1"
+    elif phase == 2:
+        lines = PHASE_2
+        key = "phase2"
+    else:
+        raise ValueError("phase moet 1 of 2 zijn")
+
+    chosen = random.choice(lines)
+
+    if avoid_repeat and len(lines) > 1:
+        last = _LAST_PICK.get(key)
+        tries = 0
+        while chosen == last and tries < 10:
+            chosen = random.choice(lines)
+            tries += 1
+
+    type_text(chosen, human=human, enter=enter, pick_random=False, force_lower=True)
+    _LAST_PICK[key] = chosen
+    return chosen
 
 # =========================
 # === SELF TEST ==========
 # =========================
 if __name__ == "__main__":
-    print("\n⌨️ ai_keyboard SELF TEST")
+
+    print("⌨️ TEST START")
     time.sleep(2)
 
-    press_key("esc")
-    press_key("enter")
+    type_text("SUP", "I'LL HOP", enter=True)          # random 1 van de 2, altijd lower
+    time.sleep(1)
 
-    hold_key("space")
-    hold_key_range("up", 0.2, 0.6)
+    type_text("SUP", "I'LL HOP", join=True, enter=True)  # alles samen
+    time.sleep(1)
 
-    type_text("Test 123")
-    press_key("enter")
+    type_random_phrase(phase=1)
+    time.sleep(1)
+    type_random_phrase(phase=2)
 
-    type_text_human("Menselijk typen voelt nu natuurlijk 😄")
-    press_key("enter")
-
-    print("\n✅ klaar\n")
+    print("✅ klaar")

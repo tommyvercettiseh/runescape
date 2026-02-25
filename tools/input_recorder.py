@@ -1,283 +1,377 @@
 ﻿from __future__ import annotations
 
 import json
-import sys
 import time
 import threading
-import subprocess
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
 
-from pynput import mouse, keyboard
-
+import ctypes as ct
+from ctypes import wintypes as wt
 
 # =========================
-# PATHS
+# OUTPUT
 # =========================
-ROOT = Path(__file__).resolve().parents[1]
-OUT_DIR = ROOT / "recordings"
+OUT_DIR = Path(__file__).resolve().parent / "recordings"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-LOCK_FILE = OUT_DIR / ".input_recorder.lock"
-
-START_KEY = keyboard.Key.f7
-STOP_KEY = keyboard.Key.f8
-
-
-def _now_stamp() -> str:
+def now_stamp() -> str:
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-
-def _key_to_str(k) -> str:
-    try:
-        return k.char  # type: ignore[attr-defined]
-    except Exception:
-        return str(k).replace("Key.", "")
-
-
-def _pick_python_exe() -> str:
-    return sys.executable
-
-
-def _acquire_lock(path: Path):
-    try:
-        import msvcrt
-    except Exception:
-        return None
-
-    f = open(path, "a+", encoding="utf-8")
-    try:
-        msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
-        f.seek(0)
-        f.truncate()
-        f.write(str(Path(sys.argv[0]).resolve()))
-        f.flush()
-        return f
-    except OSError:
-        try:
-            f.close()
-        except Exception:
-            pass
-        return None
-
-
-def _release_lock(f):
-    if not f:
-        return
-    try:
-        import msvcrt
-        f.seek(0)
-        msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
-    except Exception:
-        pass
-    try:
-        f.close()
-    except Exception:
-        pass
-
+def now_ns() -> int:
+    return time.perf_counter_ns()
 
 # =========================
-# EVENT MODEL
+# wintypes fixes
+# =========================
+if not hasattr(wt, "HCURSOR"):
+    wt.HCURSOR = wt.HANDLE
+if not hasattr(wt, "HICON"):
+    wt.HICON = wt.HANDLE
+if not hasattr(wt, "HBRUSH"):
+    wt.HBRUSH = wt.HANDLE
+if not hasattr(wt, "HINSTANCE"):
+    wt.HINSTANCE = wt.HANDLE
+if not hasattr(wt, "HRAWINPUT"):
+    wt.HRAWINPUT = wt.HANDLE
+
+USER32 = ct.WinDLL("user32", use_last_error=True)
+KERNEL32 = ct.WinDLL("kernel32", use_last_error=True)
+
+WM_INPUT = 0x00FF
+RIM_TYPEMOUSE = 0x00000000
+RID_INPUT = 0x10000003
+RIDEV_INPUTSINK = 0x00000100
+
+RI_MOUSE_WHEEL = 0x0400
+RI_MOUSE_HWHEEL = 0x0800
+MOUSE_MOVE_ABSOLUTE = 0x0001
+
+class RAWINPUTDEVICE(ct.Structure):
+    _fields_ = [
+        ("usUsagePage", wt.USHORT),
+        ("usUsage", wt.USHORT),
+        ("dwFlags", wt.DWORD),
+        ("hwndTarget", wt.HWND),
+    ]
+
+class RAWINPUTHEADER(ct.Structure):
+    _fields_ = [
+        ("dwType", wt.DWORD),
+        ("dwSize", wt.DWORD),
+        ("hDevice", wt.HANDLE),
+        ("wParam", wt.WPARAM),
+    ]
+
+class RAWMOUSE(ct.Structure):
+    _fields_ = [
+        ("usFlags", wt.USHORT),
+        ("usButtonFlags", wt.USHORT),
+        ("usButtonData", wt.USHORT),
+        ("ulRawButtons", wt.ULONG),
+        ("lLastX", wt.LONG),
+        ("lLastY", wt.LONG),
+        ("ulExtraInformation", wt.ULONG),
+    ]
+
+class RAWINPUTDATA_UNION(ct.Union):
+    _fields_ = [("mouse", RAWMOUSE)]
+
+class RAWINPUT(ct.Structure):
+    _fields_ = [
+        ("header", RAWINPUTHEADER),
+        ("data", RAWINPUTDATA_UNION),
+    ]
+
+class WNDCLASSEXW(ct.Structure):
+    _fields_ = [
+        ("cbSize", wt.UINT),
+        ("style", wt.UINT),
+        ("lpfnWndProc", wt.WPARAM),
+        ("cbClsExtra", ct.c_int),
+        ("cbWndExtra", ct.c_int),
+        ("hInstance", wt.HINSTANCE),
+        ("hIcon", wt.HICON),
+        ("hCursor", wt.HCURSOR),
+        ("hbrBackground", wt.HBRUSH),
+        ("lpszMenuName", wt.LPCWSTR),
+        ("lpszClassName", wt.LPCWSTR),
+        ("hIconSm", wt.HICON),
+    ]
+
+class MSG(ct.Structure):
+    _fields_ = [
+        ("hwnd", wt.HWND),
+        ("message", wt.UINT),
+        ("wParam", wt.WPARAM),
+        ("lParam", wt.LPARAM),
+        ("time", wt.DWORD),
+        ("pt", wt.POINT),
+    ]
+
+def wheel_value(usButtonFlags: int, usButtonData: int):
+    if usButtonFlags & RI_MOUSE_WHEEL:
+        return ct.c_short(usButtonData).value, "wheel"
+    if usButtonFlags & RI_MOUSE_HWHEEL:
+        return ct.c_short(usButtonData).value, "hwheel"
+    return None, None
+
+# =========================
+# Recorder core
 # =========================
 @dataclass
-class Event:
-    t: float
-    type: str
-    x: int | None = None
-    y: int | None = None
+class Meta:
+    created: str
+    t0_ns: int
+    events_written: int = 0
+    duration_sec: float = 0.0
+    path: str = ""
 
-    # clicks
-    button: str | None = None
-    pressed: bool | None = None
+class RawMouseSink:
+    def __init__(self, on_event):
+        self.on_event = on_event
+        self.hwnd = None
+        self._running = False
+        self._thread = None
+        self.t0_ns = now_ns()
 
-    # keyboard
-    key: str | None = None
+        self.WNDPROC = ct.WINFUNCTYPE(wt.LRESULT, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
 
-    # scroll (vertical + horizontal)
-    dx: int | None = None
-    dy: int | None = None
+        @self.WNDPROC
+        def _wndproc(hwnd, msg, wparam, lparam):
+            if msg == WM_INPUT:
+                dwSize = wt.UINT(0)
+                USER32.GetRawInputData(wt.HRAWINPUT(lparam), RID_INPUT, None, ct.byref(dwSize), ct.sizeof(RAWINPUTHEADER))
+                size = int(dwSize.value)
+                if size <= 0:
+                    return USER32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
+                buf = (ct.c_byte * size)()
+                res = USER32.GetRawInputData(wt.HRAWINPUT(lparam), RID_INPUT, ct.byref(buf), ct.byref(dwSize), ct.sizeof(RAWINPUTHEADER))
+                if res == 0xFFFFFFFF:
+                    return USER32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
-class InputRecorder:
-    def __init__(self) -> None:
-        self.running = False
-        self.t0 = 0.0
-        self.events: list[Event] = []
+                raw = ct.cast(buf, ct.POINTER(RAWINPUT)).contents
+                if raw.header.dwType == RIM_TYPEMOUSE:
+                    m = raw.data.mouse
+                    t_ns = now_ns() - self.t0_ns
+
+                    wheel, wheel_kind = wheel_value(int(m.usButtonFlags), int(m.usButtonData))
+                    ev = {
+                        "t_ns": int(t_ns),
+                        "type": "raw_mouse",
+                        "device": int(ct.cast(raw.header.hDevice, ct.c_void_p).value or 0),
+                        "dx": int(m.lLastX),
+                        "dy": int(m.lLastY),
+                        "abs": bool(m.usFlags & MOUSE_MOVE_ABSOLUTE),
+                        "flags": int(m.usFlags),
+                        "btn_flags": int(m.usButtonFlags),
+                        "wheel": wheel,
+                        "wheel_kind": wheel_kind,
+                        "extra": int(m.ulExtraInformation),
+                    }
+                    self.on_event(ev)
+                    return 0
+            return USER32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+        self._wndproc = _wndproc
+
+    def start(self):
+        if self._thread and self._thread.is_alive():
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._running = False
+        if self.hwnd:
+            try:
+                USER32.PostMessageW(self.hwnd, 0x0012, 0, 0)
+            except Exception:
+                pass
+
+    def _run(self):
+        hInstance = KERNEL32.GetModuleHandleW(None)
+        class_name = "RawHoverRunnerHiddenWindow"
+
+        wc = WNDCLASSEXW()
+        wc.cbSize = ct.sizeof(WNDCLASSEXW)
+        wc.style = 0
+        wc.lpfnWndProc = ct.cast(self._wndproc, wt.WPARAM)
+        wc.cbClsExtra = 0
+        wc.cbWndExtra = 0
+        wc.hInstance = hInstance
+        wc.hIcon = None
+        wc.hCursor = None
+        wc.hbrBackground = None
+        wc.lpszMenuName = None
+        wc.lpszClassName = class_name
+        wc.hIconSm = None
+
+        USER32.RegisterClassExW(ct.byref(wc))
+
+        hwnd = USER32.CreateWindowExW(
+            0, class_name, "RawHoverRunner",
+            0, 0, 0, 0, 0,
+            None, None, hInstance, None
+        )
+        self.hwnd = hwnd
+        if not hwnd:
+            return
+
+        rid = RAWINPUTDEVICE()
+        rid.usUsagePage = 0x01
+        rid.usUsage = 0x02
+        rid.dwFlags = RIDEV_INPUTSINK
+        rid.hwndTarget = hwnd
+
+        ok = USER32.RegisterRawInputDevices(ct.byref(rid), 1, ct.sizeof(RAWINPUTDEVICE))
+        if not ok:
+            return
+
+        msg = MSG()
+        while self._running:
+            got = USER32.GetMessageW(ct.byref(msg), None, 0, 0)
+            if got in (0, -1):
+                break
+            USER32.TranslateMessage(ct.byref(msg))
+            USER32.DispatchMessageW(ct.byref(msg))
+
+class Recorder:
+    def __init__(self):
+        self.state = "ready"  # ready, recording, paused
         self._lock = threading.Lock()
+        self._count = 0
+        self._meta: Meta | None = None
+        self._file = None
+        self._t0_ns = 0
 
-        self._mouse_listener = mouse.Listener(
-            on_move=self._on_move,
-            on_click=self._on_click,
-            on_scroll=self._on_scroll,
-        )
-        self._kb_listener = keyboard.Listener(
-            on_press=self._on_press,
-            on_release=self._on_release,
-        )
-        self._listeners_started = False
+        self.sink = RawMouseSink(self._on_raw_event)
+        self.sink.start()
 
-    def start_listeners(self) -> None:
-        if self._listeners_started:
-            return
-        self._listeners_started = True
-        self._mouse_listener.start()
-        self._kb_listener.start()
+    def _on_raw_event(self, ev: dict):
+        with self._lock:
+            if self.state != "recording":
+                return
+            if not self._file:
+                return
+            self._file.write(json.dumps(ev, separators=(",", ":"), ensure_ascii=False) + "\n")
+            self._file.flush()
+            self._count += 1
 
-    def stop_listeners(self) -> None:
+    def start(self):
+        with self._lock:
+            if self.state == "recording":
+                return
+            stamp = now_stamp()
+            out = OUT_DIR / f"hover_session_{stamp}"
+            out.mkdir(parents=True, exist_ok=True)
+
+            self._t0_ns = now_ns()
+            self.sink.t0_ns = self._t0_ns
+            self._count = 0
+
+            log_path = out / "mouse_raw.jsonl"
+            self._file = log_path.open("a", encoding="utf-8")
+
+            self._meta = Meta(created=stamp, t0_ns=self._t0_ns, path=str(out))
+            (out / "meta.json").write_text(json.dumps(asdict(self._meta), indent=2), encoding="utf-8")
+
+            self.state = "recording"
+
+    def pause(self):
+        with self._lock:
+            if self.state == "recording":
+                self.state = "paused"
+
+    def resume(self):
+        with self._lock:
+            if self.state == "paused":
+                self.state = "recording"
+
+    def stop_save(self):
+        with self._lock:
+            if self.state == "ready":
+                return None
+            dur = (now_ns() - self._t0_ns) / 1e9 if self._t0_ns else 0.0
+            count = self._count
+            path = self._meta.path if self._meta else None
+
+            try:
+                if self._file:
+                    self._file.close()
+            except Exception:
+                pass
+            self._file = None
+
+            if path:
+                meta_path = Path(path) / "meta.json"
+                if meta_path.exists():
+                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                    meta["duration_sec"] = round(dur, 6)
+                    meta["events_written"] = int(count)
+                    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+            self.state = "ready"
+            return path
+
+    def stats(self):
+        with self._lock:
+            st = self.state
+            count = self._count
+            dur = (now_ns() - self._t0_ns) / 1e9 if self._t0_ns else 0.0
+        return st, dur, count
+
+    def shutdown(self):
         try:
-            self._mouse_listener.stop()
+            self.sink.stop()
         except Exception:
             pass
-        try:
-            self._kb_listener.stop()
-        except Exception:
-            pass
 
-    def _t(self) -> float:
-        return time.perf_counter() - self.t0
-
-    def _push(self, e: Event) -> None:
-        if not self.running:
-            return
-        with self._lock:
-            self.events.append(e)
-
-    # =========================
-    # MOUSE
-    # =========================
-    def _on_move(self, x: int, y: int) -> None:
-        self._push(Event(t=self._t(), type="mouse_move", x=int(x), y=int(y)))
-
-    def _on_click(self, x: int, y: int, btn, pressed: bool) -> None:
-        b = "right" if btn == mouse.Button.right else "left"
-        self._push(
-            Event(
-                t=self._t(),
-                type="mouse_click",
-                x=int(x),
-                y=int(y),
-                button=b,
-                pressed=bool(pressed),
-            )
-        )
-
-    def _on_scroll(self, x: int, y: int, dx: int, dy: int) -> None:
-        dx = int(dx)
-        dy = int(dy)
-
-        # skip ruis (dit zag je in je logs)
-        if dx == 0 and dy == 0:
-            return
-
-        self._push(
-            Event(
-                t=self._t(),
-                type="mouse_scroll",
-                x=int(x),
-                y=int(y),
-                dx=dx,
-                dy=dy,
-            )
-        )
-
-    # =========================
-    # KEYBOARD
-    # =========================
-    def _on_press(self, k) -> None:
-        if k == START_KEY and not self.running:
-            self.start()
-            return
-        if k == STOP_KEY and self.running:
-            self.stop_and_save()
-            return
-
-        self._push(Event(t=self._t(), type="key", key=_key_to_str(k), pressed=True))
-
-    def _on_release(self, k) -> None:
-        self._push(Event(t=self._t(), type="key", key=_key_to_str(k), pressed=False))
-
-    # =========================
-    # CONTROL
-    # =========================
-    def start(self) -> None:
-        self.running = True
-        self.t0 = time.perf_counter()
-        with self._lock:
-            self.events.clear()
-
-    def stop_and_save(self) -> Path | None:
-        if not self.running:
-            return None
-
-        self.running = False
-        with self._lock:
-            duration = self.events[-1].t if self.events else 0.0
-            events_copy = list(self.events)
-
-        payload = {
-            "meta": {
-                "created": _now_stamp(),
-                "duration_sec": round(duration, 6),
-                "start_key": "F7",
-                "stop_key": "F8",
-                "events": len(events_copy),
-            },
-            "events": [asdict(e) for e in events_copy],
-        }
-
-        out = OUT_DIR / f"input_log_{payload['meta']['created']}.json"
-        out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        return out
-
-    def stats(self) -> tuple[bool, float, int]:
-        with self._lock:
-            n = len(self.events)
-        elapsed = (time.perf_counter() - self.t0) if self.running else 0.0
-        return self.running, elapsed, n
-
-
-class RecorderUI(tk.Tk):
-    def __init__(self) -> None:
+# =========================
+# UI
+# =========================
+class App(tk.Tk):
+    def __init__(self):
         super().__init__()
-
-        self.title("Input Recorder")
+        self.title("RAW Hover Runner")
         self.resizable(False, False)
+        self.attributes("-topmost", True)
 
-        self.rec = InputRecorder()
-        self.rec.start_listeners()
+        self.rec = Recorder()
 
-        pad = 12
+        pad = 10
         frm = ttk.Frame(self, padding=pad)
         frm.grid()
 
-        self.status_var = tk.StringVar(value="🟡 Ready")
-        self.time_var = tk.StringVar(value="0.00s")
-        self.count_var = tk.StringVar(value="0")
+        self.status = tk.StringVar(value="🟡 Ready")
+        self.timev = tk.StringVar(value="0.00s")
+        self.countv = tk.StringVar(value="0")
 
-        ttk.Label(frm, textvariable=self.status_var, font=("Segoe UI", 12, "bold")).grid(
-            row=0, column=0, columnspan=4, sticky="w"
+        ttk.Label(frm, textvariable=self.status, font=("Segoe UI", 12, "bold")).grid(
+            row=0, column=0, columnspan=3, sticky="w"
         )
 
         ttk.Label(frm, text="Time:").grid(row=1, column=0, sticky="e", padx=(0, 6))
-        ttk.Label(frm, textvariable=self.time_var, width=10).grid(row=1, column=1, sticky="w")
-
+        ttk.Label(frm, textvariable=self.timev, width=10).grid(row=1, column=1, sticky="w")
         ttk.Label(frm, text="Events:").grid(row=1, column=2, sticky="e", padx=(12, 6))
-        ttk.Label(frm, textvariable=self.count_var, width=10).grid(row=1, column=3, sticky="w")
+        ttk.Label(frm, textvariable=self.countv, width=10).grid(row=1, column=3, sticky="w")
 
-        self.btn_start = ttk.Button(frm, text="⏺ Start (F7)", command=self.on_start, width=18)
-        self.btn_stop = ttk.Button(frm, text="⏹ Stop + Save (F8)", command=self.on_stop, width=18)
+        self.btn_play = ttk.Button(frm, text="▶ Play", command=self.on_play, width=12)
+        self.btn_pause = ttk.Button(frm, text="⏸ Pause", command=self.on_pause, width=12)
+        self.btn_stop = ttk.Button(frm, text="⏹ Stop+Save", command=self.on_stop, width=12)
 
-        self.btn_start.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky="ew")
-        self.btn_stop.grid(row=2, column=2, columnspan=2, pady=(10, 0), sticky="ew")
+        self.btn_play.grid(row=2, column=0, pady=(10, 0), sticky="ew")
+        self.btn_pause.grid(row=2, column=1, pady=(10, 0), sticky="ew")
+        self.btn_stop.grid(row=2, column=2, pady=(10, 0), sticky="ew")
 
-        self.btn_stop.state(["disabled"])
-
-        ttk.Label(frm, text="Tip: F7 start • F8 stop+save • ESC = quit", foreground="#666").grid(
-            row=3, column=0, columnspan=4, pady=(10, 0), sticky="w"
+        ttk.Label(frm, text="Tip: hover/click wat je wil, hij logt RAWINPUT.", foreground="#666").grid(
+            row=3, column=0, columnspan=3, pady=(8, 0), sticky="w"
         )
 
         self.bind("<Escape>", lambda _e: self.on_quit())
@@ -285,91 +379,41 @@ class RecorderUI(tk.Tk):
 
         self._tick()
 
-    def on_start(self) -> None:
-        if self.rec.running:
-            return
-        self.rec.start()
-        self.status_var.set("🔴 Recording...")
-        self.btn_start.state(["disabled"])
-        self.btn_stop.state(["!disabled"])
+    def on_play(self):
+        st, _, _ = self.rec.stats()
+        if st == "paused":
+            self.rec.resume()
+        else:
+            self.rec.start()
 
-    def on_stop(self) -> None:
-        out = self.rec.stop_and_save()
-        self.btn_start.state(["!disabled"])
-        self.btn_stop.state(["disabled"])
-        self.status_var.set("🟢 Saved" if out else "🟡 Ready")
-        if out:
-            messagebox.showinfo("Saved", f"🧾 Saved:\n{out}")
+    def on_pause(self):
+        self.rec.pause()
 
-    def on_quit(self) -> None:
+    def on_stop(self):
+        path = self.rec.stop_save()
+        if path:
+            self.status.set(f"🟢 Saved: {Path(path).name}")
+
+    def on_quit(self):
         try:
-            self.rec.running = False
-            self.rec.stop_listeners()
+            self.rec.shutdown()
         finally:
             self.destroy()
 
-    def _tick(self) -> None:
-        running, elapsed, count = self.rec.stats()
-        self.count_var.set(str(count))
-        if running:
-            self.time_var.set(f"{elapsed:.2f}s")
+    def _tick(self):
+        st, dur, count = self.rec.stats()
+        self.countv.set(str(count))
+        if st == "recording":
+            self.status.set("🔴 Recording...")
+            self.timev.set(f"{dur:.2f}s")
+        elif st == "paused":
+            self.status.set("🟠 Paused")
+            self.timev.set(f"{dur:.2f}s")
         else:
-            self.time_var.set("0.00s")
+            if not self.status.get().startswith("🟢 Saved"):
+                self.status.set("🟡 Ready")
+            self.timev.set("0.00s")
         self.after(50, self._tick)
 
-
-def start_child_and_exit():
-    py = _pick_python_exe()
-    script = str(Path(__file__).resolve())
-    create_flag = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-    subprocess.Popen([py, script, "child"], creationflags=create_flag, close_fds=True)
-    raise SystemExit
-
-
-def launcher_ui():
-    root = tk.Tk()
-    root.title("Recorder Launcher")
-    root.resizable(False, False)
-
-    ttk.Label(root, text="Start 1 recorder instance in een eigen console.").grid(
-        row=0, column=0, padx=12, pady=(12, 6)
-    )
-
-    def go():
-        root.destroy()
-        start_child_and_exit()
-
-    ttk.Button(root, text="Start Recorder", command=go).grid(
-        row=1, column=0, padx=12, pady=(0, 12), sticky="ew"
-    )
-    root.mainloop()
-
-
 if __name__ == "__main__":
-    import signal
-
-    try:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
-    except Exception:
-        pass
-
-    if len(sys.argv) == 1:
-        launcher_ui()
-        raise SystemExit
-
-    if sys.argv[1] != "child":
-        raise SystemExit("Onbekende args")
-
-    lock_handle = _acquire_lock(LOCK_FILE)
-    if lock_handle is None:
-        try:
-            messagebox.showwarning("Already running", "🟡 Input Recorder draait al.")
-        except Exception:
-            pass
-        raise SystemExit
-
-    try:
-        ui = RecorderUI()
-        ui.mainloop()
-    finally:
-        _release_lock(lock_handle)
+    App().mainloop()

@@ -13,10 +13,11 @@ if str(ROOT) not in sys.path:
 # ============================================================
 import json
 import time
+import re
 import cv2
 import numpy as np
 import pyautogui
-
+from send_screenshot import send_area_shot
 from core.bot_offsets import apply_offset
 from helpers.log import log
 from vision.colours import normalize_colour, compile_ranges_np
@@ -57,6 +58,134 @@ CACHE_MS = 0
 
 def _now_ms():
     return int(time.time() * 1000)
+
+def clamp(v, lo, hi):
+    return max(lo, min(hi, v))
+
+# ============================================================
+# HEX / HSV HELPERS
+# ============================================================
+_HEX_RE = re.compile(r"^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+
+def hex_to_rgb(hex_code: str):
+    m = _HEX_RE.match(hex_code.strip())
+    if not m:
+        raise ValueError(f"Ongeldige HEX kleur: {hex_code}")
+    h = m.group(1)
+    if len(h) == 3:
+        h = "".join([c * 2 for c in h])  # #0FF -> #00FFFF
+    r = int(h[0:2], 16)
+    g = int(h[2:4], 16)
+    b = int(h[4:6], 16)
+    return (r, g, b)
+
+def rgb_to_hsv_pixel(rgb):
+    arr = np.uint8([[list(rgb)]])
+    hsv = cv2.cvtColor(arr, cv2.COLOR_RGB2HSV)[0, 0]
+    return (int(hsv[0]), int(hsv[1]), int(hsv[2]))
+
+def build_hsv_ranges_from_pixel(h, s, v, tol_h=8, tol_s=60, tol_v=60):
+    """
+    Snapt HSV ranges rondom 1 pixel.
+    Hue wrap fix: als door 0/179 => 2 ranges.
+    Output: list[((lo),(hi)), ...] met ints.
+    """
+    lo_h = h - tol_h
+    hi_h = h + tol_h
+
+    lo_s = clamp(s - tol_s, 0, 255)
+    hi_s = clamp(s + tol_s, 0, 255)
+    lo_v = clamp(v - tol_v, 0, 255)
+    hi_v = clamp(v + tol_v, 0, 255)
+
+    if lo_h < 0:
+        r1 = ((0, lo_s, lo_v), (clamp(hi_h, 0, 179), hi_s, hi_v))
+        r2 = ((clamp(179 + lo_h, 0, 179), lo_s, lo_v), (179, hi_s, hi_v))
+        return [r1, r2]
+
+    if hi_h > 179:
+        r1 = ((clamp(lo_h, 0, 179), lo_s, lo_v), (179, hi_s, hi_v))
+        r2 = ((0, lo_s, lo_v), (clamp(hi_h - 179, 0, 179), hi_s, hi_v))
+        return [r1, r2]
+
+    return [((clamp(lo_h, 0, 179), lo_s, lo_v), (clamp(hi_h, 0, 179), hi_s, hi_v))]
+
+def _ranges_to_np(ranges):
+    out = []
+    for lo, hi in ranges:
+        out.append((np.array(lo, dtype=np.uint8), np.array(hi, dtype=np.uint8)))
+    return out
+
+def _is_hex_string(x):
+    if not isinstance(x, str):
+        return False
+    return _HEX_RE.match(x.strip()) is not None
+
+def _resolve_colour_input(colour, *, tol_h=8, tol_s=60, tol_v=60, colour_space="auto"):
+    """
+    Ondersteunt:
+      1) kleurnaam in vision/colours.py (bijv 'cyaan')
+      2) HEX string '#00FFFF' of '0FF'
+      3) HSV tuple (H 0..179, S 0..255, V 0..255) bijv (90,255,255)
+      4) RGB tuple (R 0..255, G 0..255, B 0..255) (alleen als colour_space='rgb' of auto detect)
+    Return:
+      (label, ranges_np, meta)
+      label = string voor logging
+      ranges_np = list[(lo_np, hi_np)]
+      meta = dict met debug info
+    """
+    meta = {"input": colour, "type": None}
+
+    # 1) HEX
+    if _is_hex_string(colour):
+        rgb = hex_to_rgb(colour)
+        hsv = rgb_to_hsv_pixel(rgb)
+        ranges = build_hsv_ranges_from_pixel(hsv[0], hsv[1], hsv[2], tol_h, tol_s, tol_v)
+        meta.update({"type": "hex", "rgb": rgb, "hsv_pixel": hsv, "ranges": ranges})
+        return f"hex({colour.strip()})", _ranges_to_np(ranges), meta
+
+    # 2) tuple/list (HSV of RGB)
+    if isinstance(colour, (tuple, list)) and len(colour) == 3:
+        a, b, c = [int(x) for x in colour]
+
+        # force
+        if str(colour_space).lower() == "hsv":
+            hsv = (clamp(a, 0, 179), clamp(b, 0, 255), clamp(c, 0, 255))
+            ranges = build_hsv_ranges_from_pixel(hsv[0], hsv[1], hsv[2], tol_h, tol_s, tol_v)
+            meta.update({"type": "hsv", "hsv_pixel": hsv, "ranges": ranges})
+            return f"hsv{hsv}", _ranges_to_np(ranges), meta
+
+        if str(colour_space).lower() == "rgb":
+            rgb = (clamp(a, 0, 255), clamp(b, 0, 255), clamp(c, 0, 255))
+            hsv = rgb_to_hsv_pixel(rgb)
+            ranges = build_hsv_ranges_from_pixel(hsv[0], hsv[1], hsv[2], tol_h, tol_s, tol_v)
+            meta.update({"type": "rgb", "rgb": rgb, "hsv_pixel": hsv, "ranges": ranges})
+            return f"rgb{rgb}", _ranges_to_np(ranges), meta
+
+        # auto:
+        # als eerste <= 179 dan nemen we aan HSV (jouw use-case: (90,255,255))
+        if 0 <= a <= 179 and 0 <= b <= 255 and 0 <= c <= 255:
+            hsv = (a, b, c)
+            ranges = build_hsv_ranges_from_pixel(hsv[0], hsv[1], hsv[2], tol_h, tol_s, tol_v)
+            meta.update({"type": "hsv", "hsv_pixel": hsv, "ranges": ranges})
+            return f"hsv{hsv}", _ranges_to_np(ranges), meta
+
+        # anders RGB
+        rgb = (clamp(a, 0, 255), clamp(b, 0, 255), clamp(c, 0, 255))
+        hsv = rgb_to_hsv_pixel(rgb)
+        ranges = build_hsv_ranges_from_pixel(hsv[0], hsv[1], hsv[2], tol_h, tol_s, tol_v)
+        meta.update({"type": "rgb", "rgb": rgb, "hsv_pixel": hsv, "ranges": ranges})
+        return f"rgb{rgb}", _ranges_to_np(ranges), meta
+
+    # 3) kleurnaam in dict
+    colour_name = normalize_colour(colour)
+    ranges = COLOR_RANGES_NP.get(colour_name)
+    if ranges:
+        meta.update({"type": "name", "name": colour_name})
+        return colour_name, ranges, meta
+
+    meta.update({"type": "unknown"})
+    return normalize_colour(colour), None, meta
 
 # ============================================================
 # AREAS
@@ -113,8 +242,8 @@ def grab_area_rgb(area, bot_id=1, areas=None):
 # ============================================================
 # MASK HELPERS
 # ============================================================
-def _build_mask(hsv, colour):
-    ranges = COLOR_RANGES_NP.get(colour)
+def _build_mask(hsv, ranges):
+    """ranges = list[(lo_np, hi_np)]"""
     if not ranges:
         return None
 
@@ -122,7 +251,6 @@ def _build_mask(hsv, colour):
     for lo, hi in ranges:
         m = cv2.inRange(hsv, lo, hi)
         mask = m if mask is None else cv2.bitwise_or(mask, m)
-
     return mask
 
 def _largest_blob_area(mask_u8):
@@ -140,9 +268,10 @@ def _normalize_threshold(p):
         return p * 100.0
     return p
 
-def _line(colour, area, bot_id, percent, threshold, biggest, min_size, ok):
+def _line(label, area, bot_id, percent, threshold, biggest, min_size, ok):
     icon = "🟢" if ok else "🔴"
-    kleur_ansi = ANSI.get(colour, "")
+    # als label een bekende kleurnaam is, pak ANSI, anders geen
+    kleur_ansi = ANSI.get(label, "")
     reset = ANSI["reset"]
     area_ansi = ANSI["area"]
 
@@ -154,39 +283,48 @@ def _line(colour, area, bot_id, percent, threshold, biggest, min_size, ok):
     else:
         blob_txt = f" | Blob {biggest}px"
 
+    shown = label if not isinstance(label, str) else label
     return (
         f"{icon} "
-        f"{kleur_ansi}{colour.capitalize()}{reset} in "
+        f"{kleur_ansi}{shown}{reset} in "
         f"{area_ansi}{area}{reset} | "
         f"{pct_txt}% | {pct_req} | Bot {bot_id}{blob_txt}"
     )
 
-def _debug_line(colour, area, bot_id, percent, biggest, threshold, min_size):
+def _debug_line(label, area, bot_id, percent, biggest, threshold, min_size, meta=None):
     reset = ANSI["reset"]
-    kleur_ansi = ANSI.get(colour, "")
+    kleur_ansi = ANSI.get(label, "")
     area_ansi = ANSI["area"]
     dim = ANSI["dim"]
 
     thr_txt = "n/a" if threshold is None else f"{_fmt_pct(threshold)}%"
     ms_txt = "n/a" if not min_size or min_size <= 0 else str(int(min_size))
 
+    extra = ""
+    if meta and isinstance(meta, dict):
+        if meta.get("type") in {"hex", "hsv", "rgb"}:
+            extra = f" | src={meta.get('type')} hsv={meta.get('hsv_pixel')}"
+
     return (
         f"{dim}🧪 Debug{reset} | "
-        f"{kleur_ansi}{colour}{reset} | "
+        f"{kleur_ansi}{label}{reset} | "
         f"{area_ansi}{area}{reset} | "
         f"Bot {bot_id} | "
         f"pct={_fmt_pct(percent)}% | blob={int(biggest)}px | "
-        f"thr={thr_txt} | min_size={ms_txt}"
+        f"thr={thr_txt} | min_size={ms_txt}{extra}"
     )
 
-def _make_stats(colour, percent, biggest, threshold, ok):
-    return {
-        "colour": colour,
+def _make_stats(label, percent, biggest, threshold, ok, meta=None):
+    out = {
+        "label": label,
         "percent": float(percent),
         "biggest": int(biggest),
         "threshold": None if threshold is None else float(threshold),
         "ok": bool(ok),
     }
+    if meta:
+        out["meta"] = meta
+    return out
 
 # ============================================================
 # CORE
@@ -205,20 +343,31 @@ def detect_colour(
     trace=False,
     debug=False,
     return_blob=False,
-    return_stats=False,    # ✅ nieuw
+    return_stats=False,
+    # 🆕 dynamic inputs
+    tol_h=8,
+    tol_s=60,
+    tol_v=60,
+    colour_space="auto",   # auto | hsv | rgb
 ):
     """
-    verbose=True:
-      fail  -> altijd loggen
-      ok    -> alleen loggen als debug=True
-
-    timeout=0  -> 1 check
-    timeout>0  -> wachten tot ok of timeout
-
-    return_stats=True -> return (ok, stats)
+    Ondersteunt nu:
+      detect_colour("cyaan", "Bot_Area")
+      detect_colour("#00FFFF", "Bot_Area", tol_h=10, tol_s=80, tol_v=80)
+      detect_colour((90,255,255), "Bot_Area")          # HSV pixel (OpenCV)
+      detect_colour((0,255,255), "Bot_Area")           # HSV pixel (OpenCV)
+      detect_colour((0,255,255), "Bot_Area", colour_space="hsv")
+      detect_colour((0,255,255), "Bot_Area", colour_space="rgb")  # force RGB
     """
 
-    colour = normalize_colour(colour)
+    label, ranges, meta = _resolve_colour_input(
+        colour,
+        tol_h=int(tol_h),
+        tol_s=int(tol_s),
+        tol_v=int(tol_v),
+        colour_space=colour_space,
+    )
+
     t_end = time.time() + timeout if timeout and timeout > 0 else None
 
     while True:
@@ -231,12 +380,12 @@ def detect_colour(
             rgb = cv2.GaussianBlur(rgb, (b, b), 0)
 
         hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
-        mask = _build_mask(hsv, colour)
+        mask = _build_mask(hsv, ranges)
 
         if mask is None:
-            log(verbose, f"❌ onbekende kleur: {colour}", trace)
+            log(verbose, f"❌ onbekende kleur input: {colour}", trace)
             if return_stats:
-                return False, _make_stats(colour, 0.0, 0, None, False)
+                return False, _make_stats(label, 0.0, 0, None, False, meta)
             return (False, 0) if return_blob else False
 
         percent = (mask > 0).mean() * 100.0
@@ -252,23 +401,22 @@ def detect_colour(
         if min_size and min_size > 0:
             ok = ok and biggest >= min_size
 
-        # ✅ debug: altijd laten zien hoeveel % en px (handig bij ok én fail)
         if verbose and debug:
-            log(True, _debug_line(colour, area, bot_id, percent, biggest, threshold, min_size), trace)
+            log(True, _debug_line(label, area, bot_id, percent, biggest, threshold, min_size, meta), trace)
 
         if ok:
             if verbose and debug:
-                log(True, _line(colour, area, bot_id, percent, threshold, biggest, min_size, True), trace)
+                log(True, _line(label, area, bot_id, percent, threshold, biggest, min_size, True), trace)
 
             if return_stats:
-                return True, _make_stats(colour, percent, biggest, threshold, True)
+                return True, _make_stats(label, percent, biggest, threshold, True, meta)
             return (True, biggest) if return_blob else True
 
         if not timeout or timeout <= 0 or time.time() >= t_end:
-            log(verbose, _line(colour, area, bot_id, percent, threshold, biggest, min_size, False), trace)
+            log(verbose, _line(label, area, bot_id, percent, threshold, biggest, min_size, False), trace)
 
             if return_stats:
-                return False, _make_stats(colour, percent, biggest, threshold, False)
+                return False, _make_stats(label, percent, biggest, threshold, False, meta)
             return (False, biggest) if return_blob else False
 
         time.sleep(interval)
@@ -289,7 +437,7 @@ def detect_colours(
     trace=False,
 ):
     """
-    Scant 1 area en geeft per kleur:
+    Scant 1 area en geeft per kleur (alleen uit vision/colours.py dict):
       percent: hoeveel % van pixels matcht die kleur
       biggest: grootste blob (px)
 
@@ -322,7 +470,7 @@ def detect_colours(
 
     results = []
     for c in norm:
-        mask = _build_mask(hsv, c)
+        mask = _build_mask(hsv, COLOR_RANGES_NP.get(c))
         if mask is None:
             continue
 
@@ -351,44 +499,25 @@ def detect_colours(
             log(True, f"{ANSI['dim']}(niets gevonden boven filter/min_size){reset}", trace)
             return results
 
-        header = f"{ANSI['dim']}{'Kleur':<10} {'%':>8} {'Blob(px)':>10}{reset}"
+        header = f"{ANSI['dim']}{'Kleur':<16} {'%':>8} {'Blob(px)':>10}{reset}"
         log(True, header, trace)
-        log(True, f"{ANSI['dim']}{'-'*30}{reset}", trace)
+        log(True, f"{ANSI['dim']}{'-'*38}{reset}", trace)
 
         for r in results:
             c = r["colour"]
             pct = _fmt_pct(r["percent"])
             blob = r["biggest"]
             kleur_ansi = ANSI.get(c, "")
-            line = f"{kleur_ansi}{c:<10}{reset} {pct:>8}% {blob:>10}"
+            line = f"{kleur_ansi}{c:<16}{reset} {pct:>8}% {blob:>10}"
             log(True, line, trace)
 
     return results
 
 # ============================================================
-# TEST
+# QUICK TEST
 # ============================================================
 if __name__ == "__main__":
-    # Voorbeeld 1: debug prints (laat % en blob zien)
-    ok = detect_colour(
-        "groen",
-        "Skilling_Area",
-        percentage=None,
-        bot_id=1,
-        verbose=True,
-        min_size=75,
-        debug=True,
-        trace=True,
-    )
-    print("Found!" if ok else "Not found")
 
-    # Voorbeeld 2: stats terug zonder spam prints
-    ok2, stats = detect_colour(
-        "groen",
-        "Skilling_Area",
-        bot_id=1,
-        verbose=False,
-        min_size=75,
-        return_stats=True,
-    )
-    print("OK:", ok2, "STATS:", stats)
+    if detect_colour("#00FFFF", "Bot_Area", bot_id=1):
+        print("Other players around!")
+        send_area_shot("Chat_Area", "⚠️ Other players nearby 👀", bot_id=1)

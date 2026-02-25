@@ -3,11 +3,15 @@ from __future__ import annotations
 import sys
 import time
 import json
+import os
+import io
+import requests
 from pathlib import Path
 
 import cv2
 import numpy as np
 import pyautogui
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -275,6 +279,45 @@ def _detect_image_once(
     )
 
 # ============================================================
+# TELEGRAM (simple HTTP sender)
+# ============================================================
+TELEGRAM_TOKEN = os.getenv("TG_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.getenv("TG_CHAT_ID", "").strip()
+
+def _tg_enabled():
+    return bool(TELEGRAM_TOKEN) and bool(TELEGRAM_CHAT_ID)
+
+def _tg_send_photo(png_bytes: bytes, caption: str = "") -> bool:
+    if not _tg_enabled():
+        return False
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+    data = {"chat_id": TELEGRAM_CHAT_ID}
+    if caption:
+        data["caption"] = caption
+    files = {"photo": ("shot.png", png_bytes, "image/png")}
+    r = requests.post(url, data=data, files=files, timeout=10)
+    return bool(r.ok)
+
+def tg_send_area(area_name: str, bot_id: int, areas: dict | None, caption: str = "") -> bool:
+    if not _tg_enabled():
+        return False
+
+    areas = areas or load_areas()
+    if area_name not in areas:
+        return False
+
+    x1, y1, x2, y2 = map(int, apply_offset(areas[area_name], bot_id))
+    w, h = x2 - x1, y2 - y1
+    if w <= 1 or h <= 1:
+        return False
+
+    img = pyautogui.screenshot(region=(x1, y1, w, h))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return _tg_send_photo(buf.getvalue(), caption=caption)
+
+# ============================================================
 # API detect_image
 # ============================================================
 def detect_image(
@@ -288,6 +331,8 @@ def detect_image(
     interval=1.0,
     trace=False,
     trace_depth=5,
+    telegram_on_hit=False,
+    telegram_area="Chat_Area",
 ):
     v = _is_verbose(verbose)
     start = time.time()
@@ -301,6 +346,14 @@ def detect_image(
     )
     if hit:
         _log_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=v)
+
+        if telegram_on_hit:
+            try:
+                cap = f"🟢 Found: {_pretty_label(image_name)} | bot={bot_id} | vorm={hit.vorm:.2f} | kleur={hit.kleur:.2f}"
+                tg_send_area(telegram_area, bot_id, areas, caption=cap)
+            except Exception:
+                pass
+
         return hit
 
     if timeout is None or float(timeout) <= 0:
@@ -322,6 +375,14 @@ def detect_image(
         )
         if hit:
             _log_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=v)
+
+            if telegram_on_hit:
+                try:
+                    cap = f"🟢 Found: {_pretty_label(image_name)} | bot={bot_id} | vorm={hit.vorm:.2f} | kleur={hit.kleur:.2f}"
+                    tg_send_area(telegram_area, bot_id, areas, caption=cap)
+                except Exception:
+                    pass
+
             return hit
 
     _log_not_found(image_name, area_name, elapsed=time.time() - start, trace=trace, trace_depth=trace_depth, verbose=v)
@@ -445,5 +506,15 @@ if __name__ == "__main__":
     print("⚠️ CLI test: zorg dat je doelvenster zichtbaar is. Start in 2s...")
     time.sleep(2)
 
-    hit = detect_image("xp.png", "Info_Area", bot_id=1, verbose=True, timeout=5, interval=1.0)
+    # voorbeeld: telegram screenshot van Chat_Area bij hit
+    hit = detect_image(
+        "xp.png",
+        "Info_Area",
+        bot_id=1,
+        verbose=True,
+        timeout=5,
+        interval=1.0,
+        telegram_on_hit=True,
+        telegram_area="Chat_Area",
+    )
     print(f"🏁 Result: {'OK ✅' if hit else 'FAIL ❌'}")

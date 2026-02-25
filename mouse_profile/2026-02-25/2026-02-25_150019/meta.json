@@ -1,0 +1,19 @@
+{
+  "session_id": "2026-02-25_150019",
+  "created_local": "2026-02-25 15:00:20",
+  "mode": "NORMAL",
+  "sampling_ms": 8,
+  "polling_hz": 125,
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.13.1",
+  "screen_w": 1920,
+  "screen_h": 1080,
+  "window_w": 1420,
+  "window_h": 864,
+  "dpi": 96.0,
+  "protocol": {
+    "phase1_reps": 30,
+    "phase2_reps": 36,
+    "phase3_blocks": 16
+  }
+}

@@ -9,10 +9,24 @@ BOT_OFFSETS = {
     4: (958, 498),
 }
 
-# === START VERBOSE ===
-# WAT: Logt korte statusregels naar een logfile (en optioneel console).
-# WAAROM: pythonw toont geen console; logfile maakt debug zichtbaar.
+# =========================
+# DEFAULTS + PRESETS
+# =========================
+DEFAULT_PRESET_KEY = "2"  # welke preset standaard geselecteerd wordt in de launcher
+DEFAULT_VERBOSE = False
+DEFAULT_NO_OFFSETS = False
 
+# Presets: minutes (min/max)
+# green = actief/bot tijd, red = rust
+PRESETS = {
+    "1": {"name": "Chill",        "bot_min": 30, "bot_max": 50,  "rest_min": 10, "rest_max": 30},
+    "2": {"name": "Standaard",    "bot_min": 60, "bot_max": 70,  "rest_min": 10, "rest_max": 15},
+    "3": {"name": "Semi-veilig",  "bot_min": 45, "bot_max": 75,  "rest_min": 15, "rest_max": 35},
+    "4": {"name": "Harder",       "bot_min": 80, "bot_max": 120, "rest_min": 8,  "rest_max": 18},
+    "5": {"name": "Random-heavy", "bot_min": 35, "bot_max": 140, "rest_min": 12, "rest_max": 55},
+}
+
+# === START VERBOSE ===
 def get_log_path():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "overlay_verbose.log")
 
@@ -28,14 +42,9 @@ def log_status(msg, *, verbose: bool):
         print(msg)
     except:
         pass
-
 # === END VERBOSE ===
 
-
 # === START PATHS ===
-# WAT: Vindt repo-root door omhoog te lopen tot een map met "config" bestaat.
-# WAAROM: Geen hardcoded pad meer; werkt in repo-structuur.
-
 def find_repo_root(start_path):
     here = os.path.abspath(start_path)
     if os.path.isfile(here):
@@ -56,25 +65,15 @@ def get_areas_path():
     if not root:
         return None
     return os.path.join(root, "config", "areas.json")
-
 # === END PATHS ===
 
-
 # === START PYTHON ===
-# WAT: Kiest pythonw.exe als die bestaat, anders sys.executable.
-# WAAROM: Overlays zonder console-venster, maar met fallback.
-
 def pick_python_exe():
     pyw = shutil.which("pythonw")
     return pyw or sys.executable
-
 # === END PYTHON ===
 
-
 # === START LAUNCHER ===
-# WAT: GUI om 4 overlay processen te starten.
-# WAAROM: Snel starten + verbose + offset-test.
-
 def start_bots(bot_min, bot_max, rest_min, rest_max, verbose, no_offsets):
     py = pick_python_exe()
     script = os.path.abspath(__file__)
@@ -85,36 +84,59 @@ def start_bots(bot_min, bot_max, rest_min, rest_max, verbose, no_offsets):
             args.append("verbose")
         if no_offsets:
             args.append("no_offsets")
-
         subprocess.Popen(args, close_fds=True)
 
 def main_launcher():
     root = tk.Tk()
     root.title("Bot Overlay Launcher")
 
-    tk.Label(root, text="Bottijd min (min):").grid(row=0, column=0)
+    # preset selector
+    tk.Label(root, text="Preset:").grid(row=0, column=0, sticky="w")
+    preset_var = tk.StringVar(value=DEFAULT_PRESET_KEY)
+
+    preset_labels = {k: f"{k}. {v['name']}  (groen {v['bot_min']}-{v['bot_max']}m, rust {v['rest_min']}-{v['rest_max']}m)"
+                     for k, v in PRESETS.items()}
+
+    preset_menu = tk.OptionMenu(root, preset_var, *PRESETS.keys())
+    preset_menu.grid(row=0, column=1, columnspan=3, sticky="we")
+
+    preset_desc = tk.Label(root, text=preset_labels.get(DEFAULT_PRESET_KEY, ""), fg="gray30", justify="left")
+    preset_desc.grid(row=1, column=0, columnspan=4, sticky="w", padx=2)
+
+    def apply_preset(*_):
+        k = preset_var.get()
+        p = PRESETS.get(k, PRESETS[DEFAULT_PRESET_KEY])
+        bot_min.set(p["bot_min"])
+        bot_max.set(p["bot_max"])
+        rest_min.set(p["rest_min"])
+        rest_max.set(p["rest_max"])
+        preset_desc.config(text=preset_labels.get(k, ""))
+
+    preset_var.trace_add("write", apply_preset)
+
+    # sliders
+    tk.Label(root, text="Bottijd min (min):").grid(row=2, column=0)
     bot_min = tk.Scale(root, from_=30, to=180, orient="horizontal", width=8, length=120)
-    bot_min.set(60)
-    bot_min.grid(row=0, column=1)
-    tk.Label(root, text="max:").grid(row=0, column=2)
+    bot_min.grid(row=2, column=1)
+    tk.Label(root, text="max:").grid(row=2, column=2)
     bot_max = tk.Scale(root, from_=31, to=240, orient="horizontal", width=8, length=120)
-    bot_max.set(70)
-    bot_max.grid(row=0, column=3)
+    bot_max.grid(row=2, column=3)
 
-    tk.Label(root, text="Rust min (min):").grid(row=1, column=0)
+    tk.Label(root, text="Rust min (min):").grid(row=3, column=0)
     rest_min = tk.Scale(root, from_=5, to=90, orient="horizontal", width=8, length=120)
-    rest_min.set(10)
-    rest_min.grid(row=1, column=1)
-    tk.Label(root, text="max:").grid(row=1, column=2)
+    rest_min.grid(row=3, column=1)
+    tk.Label(root, text="max:").grid(row=3, column=2)
     rest_max = tk.Scale(root, from_=6, to=120, orient="horizontal", width=8, length=120)
-    rest_max.set(15)
-    rest_max.grid(row=1, column=3)
+    rest_max.grid(row=3, column=3)
 
-    verbose_var = tk.BooleanVar(value=False)
-    no_offsets_var = tk.BooleanVar(value=False)
+    verbose_var = tk.BooleanVar(value=DEFAULT_VERBOSE)
+    no_offsets_var = tk.BooleanVar(value=DEFAULT_NO_OFFSETS)
 
-    tk.Checkbutton(root, text="Verbose (logfile)", variable=verbose_var).grid(row=2, column=0, columnspan=2, sticky="w")
-    tk.Checkbutton(root, text="Test: geen offsets", variable=no_offsets_var).grid(row=2, column=2, columnspan=2, sticky="w")
+    tk.Checkbutton(root, text="Verbose (logfile)", variable=verbose_var).grid(row=4, column=0, columnspan=2, sticky="w")
+    tk.Checkbutton(root, text="Test: geen offsets", variable=no_offsets_var).grid(row=4, column=2, columnspan=2, sticky="w")
+
+    # set initial preset values
+    apply_preset()
 
     def launch_and_close():
         if verbose_var.get():
@@ -124,21 +146,17 @@ def main_launcher():
             except:
                 pass
 
-        start_bots(bot_min.get(), bot_max.get(), rest_min.get(), rest_max.get(), verbose_var.get(), no_offsets_var.get())
+        start_bots(bot_min.get(), bot_max.get(), rest_min.get(), rest_max.get(),
+                   verbose_var.get(), no_offsets_var.get())
         root.destroy()
 
     btn = tk.Button(root, text="Start Overlays", command=launch_and_close, bg="#2a8a2d", fg="white")
-    btn.grid(row=3, column=0, columnspan=4, pady=15, sticky="we")
+    btn.grid(row=5, column=0, columnspan=4, pady=12, sticky="we")
 
     root.mainloop()
-
 # === END LAUNCHER ===
 
-
 # === START OVERLAY ===
-# WAT: Overlay window met timer + exclude + force-red.
-# WAAROM: Visuele status per bot. Groen = aan, Rood = rust.
-
 def run_overlay(bot_id, bot_min, bot_max, rest_min, rest_max, verbose, no_offsets):
     log_status(f"Bot {bot_id} start 🟡", verbose=verbose)
 
@@ -156,7 +174,6 @@ def run_overlay(bot_id, bot_min, bot_max, rest_min, rest_max, verbose, no_offset
         log_status("AREA_NAME ontbreekt 🔴🖼️", verbose=verbose)
         raise SystemExit(f"AREA_NAME '{AREA_NAME}' niet gevonden in areas.json 🔴")
 
-    # ✅ JOUW JSON: {"coords":[...], "group":"..."}
     area = areas[AREA_NAME]
     base_coords = area.get("coords") if isinstance(area, dict) else area
 
@@ -180,8 +197,6 @@ def run_overlay(bot_id, bot_min, bot_max, rest_min, rest_max, verbose, no_offset
             self.win.geometry(f"{w}x{h}+{x1}+{y1}")
 
             self.excluded = False
-
-            # START IN GROEN (AAN)
             self.mode = "green"
             self.win.config(bg=self.mode)
 
@@ -204,12 +219,10 @@ def run_overlay(bot_id, bot_min, bot_max, rest_min, rest_max, verbose, no_offset
             self.timer = tk.Label(self.win, font=("Segoe UI", 8), bg=self.mode, fg="white")
             self.timer.place(x=5, y=5)
 
-            # plan eerste fase: GROEN voor bot_min..bot_max, daarna ROOD
             self.next_mode = "red"
             self.next_switch = time.time() + random.randint(bot_min * 60, bot_max * 60)
 
             log_status("Overlay gemaakt 🟢🖼️", verbose=verbose)
-
             self._loop()
 
         def _schedule_next(self):
@@ -218,18 +231,14 @@ def run_overlay(bot_id, bot_min, bot_max, rest_min, rest_max, verbose, no_offset
                 self.next_switch = float("inf")
                 return
 
-            # Huidige kleur bepaalt hoe lang we NU blijven
             if self.mode == "green":
-                # groen = actief -> duur = bot_min..bot_max
                 self.next_mode = "red"
                 secs = random.randint(bot_min * 60, bot_max * 60)
             else:
-                # rood = rust -> duur = rest_min..rest_max
                 self.next_mode = "green"
                 secs = random.randint(rest_min * 60, rest_max * 60)
 
             self.next_switch = time.time() + secs
-
 
         def _loop(self):
             now = time.time()
@@ -292,18 +301,15 @@ def run_overlay(bot_id, bot_min, bot_max, rest_min, rest_max, verbose, no_offset
 
     OverlayWindow(root, coords)
     root.mainloop()
-
 # === END OVERLAY ===
 
-
 # === START ENTRYPOINT ===
-# WAT: Start launcher zonder args, of overlay instance met args.
-# WAAROM: Zelfde bestand kan alles: GUI + 4 child-processen.
-
 if __name__ == "__main__":
+    # Zonder args: launcher
     if len(sys.argv) == 1:
         main_launcher()
     else:
+        # Met args: overlay instance
         try:
             bot_id = int(sys.argv[1])
             bot_min = int(sys.argv[2])
@@ -318,5 +324,4 @@ if __name__ == "__main__":
             raise SystemExit("Argumenten ontbreken 🔴")
 
         run_overlay(bot_id, bot_min, bot_max, rest_min, rest_max, verbose, no_offsets)
-
 # === END ENTRYPOINT ===
