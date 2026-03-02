@@ -27,7 +27,7 @@
   "Login_Screen_World.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 85.0
   },
   "Login_Screen_Play_Now.png": {
     "method": "TM_CCOEFF_NORMED",
@@ -334,11 +334,6 @@
     "min_shape": 95.0,
     "min_color": 95.0
   },
-  "USe.png": {
-    "method": "TM_CCOEFF_NORMED",
-    "min_shape": 97.0,
-    "min_color": 90.0
-  },
   "Firemaking_Continue.png": {
     "method": "TM_SQDIFF_NORMED",
     "min_shape": 90.0,
@@ -528,5 +523,10 @@
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
     "min_color": 95.0
+  },
+  "Use.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 97.0,
+    "min_color": 90.0
   }
 }

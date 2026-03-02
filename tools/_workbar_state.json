@@ -1,0 +1,12 @@
+{
+  "visible_tools": [
+    "tools\\area_debugger.py",
+    "tools\\colour_picker.py",
+    "tools\\colour_picker_debugger.py",
+    "tools\\image_debugger\\image_debugger.py",
+    "tools\\mouse_lab\\build_master_profile.py",
+    "tools\\overlay_launcher.py"
+  ],
+  "always_on_top": false,
+  "use_pythonw": false
+}

@@ -2,8 +2,9 @@
 
 import sys
 import random
-import time
+import inspect
 from pathlib import Path
+from typing import Optional, Tuple, Dict, List, Any
 
 import cv2
 import numpy as np
@@ -40,33 +41,28 @@ if str(ROOT) not in sys.path:
 # ============================================================
 # IMPORTS (project)
 # ============================================================
-from core.ai_cursor import move_and_click
 from config.areas import load_coords
 from core.bot_offsets import apply_offset
-from helpers.log import log
-from helpers.trace import trace as _trace
+from core.ansi import ANSI
 from vision.colours import normalize_colour, compile_ranges_np
 
 
-# ============================================================
-# LOGGING HELPERS
-# ============================================================
-def _title(msg):
-    log(True, f"\n{'=' * 52}\n{msg}\n{'=' * 52}")
+Point = Tuple[int, int]
+BBox = Tuple[int, int, int, int]
 
-def _table(rows, icon="🧾", title="Details"):
-    if not rows:
-        _title(f"{icon} {title}")
-        log(True, "(leeg)")
-        return
-    left_w = max(len(str(k)) for k, _ in rows)
-    _title(f"{icon} {title}")
-    for k, v in rows:
-        kk = str(k).strip().title()
-        log(True, f"{kk:<{left_w}} | {v}")
 
-def _done(verbose, trace, msg="click uitgevoerd"):
-    log(verbose, f"✅ Done  {msg}", trace)
+# ============================================================
+# LOCAL LOG + TRACE
+# ============================================================
+def log(verbose: bool, msg: str) -> None:
+    if verbose:
+        print(msg)
+
+def trace(_skip: bool = True) -> str:
+    stack = inspect.stack()
+    idx = 2 if _skip and len(stack) > 2 else 1
+    fr = stack[idx]
+    return f"{Path(fr.filename).name}:{fr.lineno} in {fr.function}()"
 
 
 # ============================================================
@@ -86,14 +82,62 @@ for k, ranges in _EXTRA_RANGES.items():
 
 
 # ============================================================
+# PRETTY PRINT HELPERS
+# ============================================================
+def _banner(title: str) -> None:
+    line = "═" * 60
+    log(True, f"\n{ANSI.subtle(line)}")
+    log(True, f"{ANSI.BOLD}{title}{ANSI.RESET}")
+    log(True, f"{ANSI.subtle(line)}")
+
+def _fmt_value(v: Any) -> str:
+    if isinstance(v, bool):
+        return ANSI.tf(v)
+    if v is None:
+        return ANSI.subtle("None")
+    if isinstance(v, (tuple, list)) and len(v) == 2 and all(isinstance(x, int) for x in v):
+        return ANSI.info(str(v))
+    if isinstance(v, str):
+        return v
+    return str(v)
+
+def _table(rows: List[Tuple[str, Any]], icon: str = "🧾", title: str = "Details") -> None:
+    _banner(f"{icon} {title}")
+    if not rows:
+        log(True, ANSI.subtle("(leeg)"))
+        return
+
+    w = max(len(str(k)) for k, _ in rows)
+    for k, v in rows:
+        key = ANSI.subtle(f"{str(k):<{w}}")
+        val = _fmt_value(v)
+        log(True, f"{key}  {ANSI.subtle('│')}  {val}")
+
+
+# ============================================================
 # HELPERS
 # ============================================================
-def _area_bbox(area_name, bot_id):
+def _area_bbox(area_name: str, bot_id: int) -> BBox:
     coords = list(load_coords(area_name))
     x1, y1, x2, y2 = apply_offset(coords, bot_id)
     return int(x1), int(y1), int(x2), int(y2)
 
-def _colour_mask_in_bbox(kleur, bbox):
+def _get_mouse_pos() -> Point:
+    if pyautogui is not None:
+        p = pyautogui.position()
+        return int(p.x), int(p.y)
+    if _MouseController is not None:
+        p = _MouseController().position
+        return int(p[0]), int(p[1])
+    return 0, 0
+
+def _kernel(px: int) -> Optional[np.ndarray]:
+    if not px or px <= 0:
+        return None
+    k = int(px) * 2 + 1
+    return np.ones((k, k), np.uint8)
+
+def _build_mask(colour: str, bbox: BBox) -> Optional[np.ndarray]:
     x1, y1, x2, y2 = bbox
     img = ImageGrab.grab(bbox=(x1, y1, x2, y2))
     np_img = np.array(img)
@@ -103,7 +147,7 @@ def _colour_mask_in_bbox(kleur, bbox):
 
     hsv = cv2.cvtColor(np_img, cv2.COLOR_RGB2HSV)
 
-    ranges = COLOR_RANGES_NP.get(kleur)
+    ranges = COLOR_RANGES_NP.get(colour)
     if not ranges:
         return None
 
@@ -114,392 +158,222 @@ def _colour_mask_in_bbox(kleur, bbox):
 
     return mask
 
-def _mask_pct(mask):
+def _apply_padding(mask: np.ndarray, padding: int) -> np.ndarray:
+    k = _kernel(int(padding))
+    if k is None:
+        return mask
+    return cv2.erode(mask, k, iterations=1)
+
+def _mask_pct(mask: np.ndarray) -> float:
     return float((mask > 0).mean() * 100.0)
 
-def _rand_from_mask(mask, x1, y1):
+def _pick_random(mask: np.ndarray, x1: int, y1: int) -> Optional[Point]:
     ys, xs = np.where(mask > 0)
     if len(xs) == 0:
         return None
     i = random.randrange(len(xs))
-    return int(xs[i]) + int(x1), int(ys[i]) + int(y1)
+    return int(xs[i]) + x1, int(ys[i]) + y1
 
-def _get_mouse_pos():
-    if pyautogui is not None:
-        p = pyautogui.position()
-        return int(p.x), int(p.y)
-    if _MouseController is not None:
-        p = _MouseController().position
-        return int(p[0]), int(p[1])
-    return 0, 0
-
-def _nearest_from_mask(mask, x1, y1, mouse_xy, k_nearest=200, weighted=True):
+def _pick_nearest_to_mouse(mask: np.ndarray, x1: int, y1: int, mouse_xy: Point, weighted: bool) -> Optional[Point]:
     ys, xs = np.where(mask > 0)
     n = len(xs)
     if n == 0:
         return None
 
     mx, my = mouse_xy
-    gx = xs.astype(np.int32) + int(x1)
-    gy = ys.astype(np.int32) + int(y1)
+    gx = xs.astype(np.int32) + x1
+    gy = ys.astype(np.int32) + y1
 
-    dx = gx - int(mx)
-    dy = gy - int(my)
-    dist2 = dx * dx + dy * dy
-
-    k = max(1, min(int(k_nearest), n))
-    idxs = np.arange(n, dtype=np.int32) if k == n else np.argpartition(dist2, k - 1)[:k]
+    dx = gx - mx
+    dy = gy - my
+    dist2 = (dx * dx + dy * dy).astype(np.float64)
 
     if not weighted:
-        j = int(random.choice(list(idxs)))
+        j = int(np.argmin(dist2))
         return int(gx[j]), int(gy[j])
 
-    d = dist2[idxs].astype(np.float64)
-    w = 1.0 / (d + 1.0)
-    pick = random.choices(list(idxs), weights=list(w), k=1)[0]
-    j = int(pick)
+    w = 1.0 / (dist2 + 1.0)
+    j = int(random.choices(range(n), weights=w.tolist(), k=1)[0])
     return int(gx[j]), int(gy[j])
 
-def _filter_mask_by_min_component_area(mask, min_area):
-    if not min_area or min_area <= 0:
-        return mask, None
-
-    num, labels, stats, _ = cv2.connectedComponentsWithStats((mask > 0).astype(np.uint8), connectivity=8)
-
-    keep = np.zeros(num, dtype=np.uint8)
-    kept = 0
-    for lab in range(1, num):
-        area = stats[lab, cv2.CC_STAT_AREA]
-        if area >= min_area:
-            keep[lab] = 1
-            kept += 1
-
-    filtered = (keep[labels] * 255).astype(np.uint8)
-    return filtered, kept
-
 
 # ============================================================
-# CLICK COLOUR (robust + alias-safe + wait/retry)
+# PUBLIC API (jouw naming intact)
 # ============================================================
-def click_colour(
+def detect_colour(
     kleur=None,
     area_name=None,
-    bot_id=1,
+    bot_id: int = 1,
 
-    button="left",
-    speed_pct=100.0,
+    padding: int = 3,
+    nearest_mouse: bool = True,
+    nearest_weighted: bool = True,
 
-    mode="deep_random",          # 'mask_random' | 'deep_random' | 'center'
-    threshold=0.005,             # alleen warning
-    jitter_range=2,
-    min_size=40,
-    dilate_px=2,
-    deep_erode_px=3,
-    deep_tries=10,
+    debug: bool = False,
+    trace_on: bool = False,
 
-    pick_strategy="random",      # 'random' | 'nearest'
-    nearest_k=200,
-    nearest_weighted=True,
-
-    prefer_center=True,
-    center_bias=0.18,
-
-    timeout=0.0,                 # ✅ nieuw: wacht tot kleur verschijnt
-    interval=0.25,               # ✅ nieuw: polling interval
-
-    verbose=True,
-    trace=False,
-    debug=False,
-
-    # legacy safe
     **_legacy,
-):
-    # ---------------------------
-    # ALIASES (zodat alles blijft werken)
-    # ---------------------------
+) -> Tuple[bool, Optional[Point], Dict[str, object]]:
     if kleur is None:
         kleur = _legacy.get("colour") or _legacy.get("color") or "paars"
     if area_name is None:
         area_name = _legacy.get("area") or _legacy.get("area_name") or "Bot_Area"
 
-    if "min_px" in _legacy and (min_size == 40):
-        min_size = _legacy["min_px"]
-    if "min_size_px" in _legacy and (min_size == 40):
-        min_size = _legacy["min_size_px"]
+    kleur = normalize_colour(str(kleur))
 
-    if "erode_px" in _legacy and (deep_erode_px == 3):
-        deep_erode_px = _legacy["erode_px"]
-
-    kleur = normalize_colour(kleur)
+    info: Dict[str, object] = {
+        "kleur": kleur,
+        "area_name": area_name,
+        "bot_id": int(bot_id),
+        "padding": int(padding),
+        "nearest_mouse": bool(nearest_mouse),
+        "nearest_weighted": bool(nearest_weighted),
+    }
 
     if kleur not in COLOR_RANGES_NP:
-        if verbose:
-            rows = [("Status", "Failed"), ("Reason", "Unknown colour"), ("Colour", kleur)]
-            if trace:
-                rows.append(("Caller", _trace(True)))
-            _table(rows, icon="❌", title="Click Colour")
-        return False
-
-    # ---------------------------
-    # WAIT LOOP (mask rebuild per poging)
-    # ---------------------------
-    t0 = time.time()
-    deadline = t0 + float(timeout or 0.0)
-
-    tries = 0
-    while True:
-        tries += 1
-
-        bbox = _area_bbox(area_name, bot_id)
-        x1, y1, x2, y2 = bbox
-
-        mask = _colour_mask_in_bbox(kleur, bbox)
-        if mask is None:
-            if time.time() >= deadline:
-                if verbose:
-                    rows = [
-                        ("Status", "Failed"),
-                        ("Reason", "Mask build failed"),
-                        ("Colour", kleur),
-                        ("Area", area_name),
-                        ("Bot", bot_id),
-                    ]
-                    if trace:
-                        rows.append(("Caller", _trace(True)))
-                    _table(rows, icon="❌", title="Click Colour")
-                return False
-            time.sleep(float(interval))
-            continue
-
-        pct = _mask_pct(mask)
-        mask_pixels_pre = int((mask > 0).sum())
-
-        # dilate
-        if dilate_px and dilate_px > 0:
-            k = int(dilate_px) * 2 + 1
-            kernel = np.ones((k, k), np.uint8)
-            mask = cv2.dilate(mask, kernel, iterations=1)
-
-        mask_pixels_post = int((mask > 0).sum())
-
-        # min_size filter
-        mask, kept_components = _filter_mask_by_min_component_area(mask, int(min_size))
-        mask_pixels_filtered = int((mask > 0).sum())
-
-        # als er niks meer over is, eventueel wachten
-        if mask_pixels_filtered <= 0:
-            if time.time() >= deadline:
-                if verbose:
-                    rows = [
-                        ("Status", "Failed"),
-                        ("Reason", "No pixels after filtering"),
-                        ("Colour", kleur.upper()),
-                        ("Area", area_name),
-                        ("Bot", bot_id),
-                        ("Tries", tries),
-                        ("Timeout", f"{timeout:.2f}s"),
-                        ("Mask Coverage", f"{pct:.2f}%"),
-                        ("Mask Pixels (pre)", f"{mask_pixels_pre:,}"),
-                        ("Mask Pixels (post)", f"{mask_pixels_post:,}"),
-                        ("Mask Pixels (filtered)", f"{mask_pixels_filtered:,}"),
-                        ("Min Size", f"{min_size} px"),
-                    ]
-                    if kept_components is not None:
-                        rows.append(("Kept Components", kept_components))
-                    if trace:
-                        rows.append(("Caller", _trace(True)))
-                    _table(rows, icon="🚫", title="Click Colour")
-                return False
-
-            time.sleep(float(interval))
-            continue
-
-        # ---------------------------
-        # PICK COORDS
-        # ---------------------------
-        mouse_xy = _get_mouse_pos()
-
-        def _pick(mask_to_use):
-            if (pick_strategy or "").lower().strip() == "nearest":
-                return _nearest_from_mask(
-                    mask_to_use,
-                    x1, y1,
-                    mouse_xy=mouse_xy,
-                    k_nearest=nearest_k,
-                    weighted=nearest_weighted,
-                )
-            return _rand_from_mask(mask_to_use, x1, y1)
-
-        chosen = None
-
-        if mode in ("mask_random", "deep_random"):
-            if mode == "deep_random" and deep_erode_px and deep_erode_px > 0:
-                kk = int(deep_erode_px) * 2 + 1
-                kernel = np.ones((kk, kk), np.uint8)
-                deep_mask = cv2.erode(mask, kernel, iterations=1)
-            else:
-                deep_mask = mask
-
-            for _ in range(max(1, int(deep_tries))):
-                chosen = _pick(deep_mask)
-                if chosen is not None:
-                    break
-
-            if chosen is None:
-                chosen = _pick(mask)
-
-            if chosen is None:
-                if time.time() >= deadline:
-                    if verbose:
-                        rows = [
-                            ("Status", "Failed"),
-                            ("Reason", "Pick failed"),
-                            ("Mode", mode),
-                            ("Colour", kleur.upper()),
-                            ("Area", area_name),
-                            ("Bot", bot_id),
-                            ("Tries", tries),
-                            ("Timeout", f"{timeout:.2f}s"),
-                        ]
-                        if trace:
-                            rows.append(("Caller", _trace(True)))
-                        _table(rows, icon="🚫", title="Click Colour")
-                    return False
-
-                time.sleep(float(interval))
-                continue
-
-            mx, my = chosen
-
-            tx = int(mx) + random.randint(-int(jitter_range), int(jitter_range))
-            ty = int(my) + random.randint(-int(jitter_range), int(jitter_range))
-
-            move_and_click((tx, ty), button=button, speed_pct=speed_pct)
-
-            if verbose and debug:
-                rows = [
-                    ("Status", "Ok (click)"),
-                    ("Mode", mode),
-                    ("Colour", kleur.upper()),
-                    ("Area", area_name),
-                    ("Bot", bot_id),
-                    ("Bbox", f"({x1},{y1},{x2},{y2})"),
-                    ("Mask Coverage", f"{pct:.2f}%"),
-                    ("Min Size", f"{min_size} px"),
-                    ("Chosen", f"({mx},{my})"),
-                    ("Click", f"({tx},{ty})  button={button}  speed={speed_pct:.0f}%"),
-                    ("Tries", tries),
-                ]
-                if pct < (threshold * 100.0):
-                    rows.append(("Warning", f"Coverage low: {pct:.3f}%"))
-                if (pick_strategy or "").lower().strip() == "nearest":
-                    rows.append(("Pick", f"Nearest  k={nearest_k} weighted={nearest_weighted}"))
-                    rows.append(("Mouse", f"({mouse_xy[0]},{mouse_xy[1]})"))
-                if trace:
-                    rows.append(("Caller", _trace(True)))
-                _table(rows, icon="🧪", title="Click Colour")
-
-            _done(verbose and debug, trace)
-            return True
-
-        # ---------------------------
-        # CENTER MODE
-        # ---------------------------
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contours = [c for c in contours if cv2.contourArea(c) >= int(min_size)]
-
-        if not contours:
-            if time.time() >= deadline:
-                if verbose:
-                    rows = [
-                        ("Status", "Failed"),
-                        ("Reason", "No contours"),
-                        ("Mode", "center"),
-                        ("Colour", kleur.upper()),
-                        ("Area", area_name),
-                        ("Bot", bot_id),
-                        ("Tries", tries),
-                    ]
-                    if trace:
-                        rows.append(("Caller", _trace(True)))
-                    _table(rows, icon="🚫", title="Click Colour")
-                return False
-
-            time.sleep(float(interval))
-            continue
-
-        cx_area = (x1 + x2) // 2
-        cy_area = (y1 + y2) // 2
-
-        def _center_score(contour):
-            M = cv2.moments(contour)
-            if M["m00"] == 0:
-                return 1e18
-            cx0 = int(M["m10"] / M["m00"]) + x1
-            cy0 = int(M["m01"] / M["m00"]) + y1
-            dist2 = (cx0 - cx_area) ** 2 + (cy0 - cy_area) ** 2
-            area0 = cv2.contourArea(contour)
-            return dist2 - (float(center_bias) * float(area0))
-
-        gekozen = min(contours, key=_center_score) if prefer_center else max(contours, key=cv2.contourArea)
-
-        M = cv2.moments(gekozen)
-        if M["m00"] == 0:
-            if time.time() >= deadline:
-                if verbose:
-                    rows = [("Status", "Failed"), ("Reason", "Moments m00=0"), ("Mode", "center")]
-                    if trace:
-                        rows.append(("Caller", _trace(True)))
-                    _table(rows, icon="⚠️", title="Click Colour")
-                return False
-
-            time.sleep(float(interval))
-            continue
-
-        cx = int(M["m10"] / M["m00"]) + x1
-        cy = int(M["m01"] / M["m00"]) + y1
-
-        tx = int(cx) + random.randint(-int(jitter_range), int(jitter_range))
-        ty = int(cy) + random.randint(-int(jitter_range), int(jitter_range))
-
-        move_and_click((tx, ty), button=button, speed_pct=speed_pct)
-
-        if verbose and debug:
+        info["reason"] = "Unknown colour"
+        if debug:
             rows = [
-                ("Status", "Ok (click)"),
-                ("Mode", "center"),
-                ("Colour", kleur.upper()),
-                ("Area", area_name),
-                ("Bot", bot_id),
-                ("Centroid", f"({cx},{cy})"),
-                ("Click", f"({tx},{ty})  button={button}  speed={speed_pct:.0f}%"),
-                ("Tries", tries),
+                ("Status", ANSI.fail("Failed")),
+                ("Reason", info["reason"]),
+                ("Kleur", ANSI.info(kleur)),
             ]
-            if trace:
-                rows.append(("Caller", _trace(True)))
-            _table(rows, icon="🧲", title="Click Colour")
+            if trace_on:
+                rows.append(("Caller", trace(True)))
+            _table(rows, icon="❌", title="Detect Colour")
+        return False, None, info
 
-        _done(verbose and debug, trace)
-        return True
+    bbox = _area_bbox(area_name, bot_id)
+    x1, y1, x2, y2 = bbox
+    info["bbox"] = bbox
+
+    mask0 = _build_mask(kleur, bbox)
+    if mask0 is None:
+        info["reason"] = "Mask build failed"
+        if debug:
+            rows = [
+                ("Status", ANSI.fail("Failed")),
+                ("Reason", info["reason"]),
+                ("Kleur", ANSI.info(kleur.upper())),
+                ("Area", ANSI.area(area_name)),
+                ("Bot", bot_id),
+            ]
+            if trace_on:
+                rows.append(("Caller", trace(True)))
+            _table(rows, icon="🚫", title="Detect Colour")
+        return False, None, info
+
+    info["mask_pct_pre"] = f"{_mask_pct(mask0):.2f}%"
+    info["pixels_pre"] = int((mask0 > 0).sum())
+
+    mask = _apply_padding(mask0, int(padding))
+    info["pixels_after_padding"] = int((mask > 0).sum())
+
+    if info["pixels_after_padding"] <= 0:
+        info["reason"] = "No pixels after padding (padding too high?)"
+        if debug:
+            rows = [
+                ("Status", ANSI.fail("Failed")),
+                ("Reason", info["reason"]),
+                ("Kleur", ANSI.info(kleur.upper())),
+                ("Area", ANSI.area(area_name)),
+                ("Bot", bot_id),
+                ("Padding", padding),
+                ("Pixels pre", f"{info['pixels_pre']:,}"),
+                ("Pixels after", f"{info['pixels_after_padding']:,}"),
+            ]
+            if trace_on:
+                rows.append(("Caller", trace(True)))
+            _table(rows, icon="🚫", title="Detect Colour")
+        return False, None, info
+
+    mouse_xy = _get_mouse_pos()
+    info["mouse_xy"] = mouse_xy
+
+    if nearest_mouse:
+        pt = _pick_nearest_to_mouse(mask, x1, y1, mouse_xy, weighted=bool(nearest_weighted))
+    else:
+        pt = _pick_random(mask, x1, y1)
+
+    if pt is None:
+        info["reason"] = "Pick failed"
+        if debug:
+            rows = [
+                ("Status", ANSI.fail("Failed")),
+                ("Reason", info["reason"]),
+                ("Kleur", ANSI.info(kleur.upper())),
+                ("Area", ANSI.area(area_name)),
+                ("Bot", bot_id),
+            ]
+            if trace_on:
+                rows.append(("Caller", trace(True)))
+            _table(rows, icon="🚫", title="Detect Colour")
+        return False, None, info
+
+    info["point"] = pt
+
+    if debug:
+        rows = [
+            ("Status", ANSI.ok("Ok")),
+            ("Kleur", ANSI.info(kleur.upper())),
+            ("Area", ANSI.area(area_name)),
+            ("Bot", bot_id),
+            ("Padding", padding),
+            ("Nearest Mouse", nearest_mouse),
+            ("Nearest Weighted", nearest_weighted),
+            ("Mouse", mouse_xy),
+            ("Point", pt),
+            ("Mask % pre", info["mask_pct_pre"]),
+            ("Pixels pre", f"{info['pixels_pre']:,}"),
+            ("Pixels after", f"{info['pixels_after_padding']:,}"),
+        ]
+        if trace_on:
+            rows.append(("Caller", trace(True)))
+        _table(rows, icon="🧪", title="Detect Colour")
+
+    return True, pt, info
+
+
+def click_colour(
+    kleur=None,
+    area_name=None,
+    bot_id: int = 1,
+
+    padding: int = 3,
+    nearest_mouse: bool = True,
+    nearest_weighted: bool = True,
+
+    debug: bool = False,
+    trace_on: bool = False,
+
+    **_legacy,
+) -> Tuple[bool, Optional[Point]]:
+    ok, pt, _info = detect_colour(
+        kleur=kleur,
+        area_name=area_name,
+        bot_id=bot_id,
+        padding=padding,
+        nearest_mouse=nearest_mouse,
+        nearest_weighted=nearest_weighted,
+        debug=debug,
+        trace_on=trace_on,
+        **_legacy,
+    )
+    return ok, pt
 
 
 # ============================================================
 # RUN (test)
 # ============================================================
 if __name__ == "__main__":
-    ok = click_colour(
+    ok, pt = click_colour(
         "cyaan",
         "Bot_Area",
         bot_id=1,
-        mode="deep_random",
-        deep_erode_px=3,
-        jitter_range=3,
-        min_size=50,
-        dilate_px=0,
-        timeout=2.0,
-        interval=0.25,
-        verbose=True,
-        trace=True,
+        padding=4,
+        nearest_mouse=True,
+        nearest_weighted=True,
         debug=True,
+        trace_on=True,
     )
-    print("OK ✅" if ok else "FAIL ❌")
+    print(ANSI.ok("OK ✅") if ok else ANSI.fail("FAIL ❌"), pt)

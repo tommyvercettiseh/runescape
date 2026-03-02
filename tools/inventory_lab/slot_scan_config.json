@@ -1,0 +1,21 @@
+{
+  "bg_hsv_ranges": [
+    [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        179,
+        80,
+        120
+      ]
+    ]
+  ],
+  "empty_bg_pct": 0.8897260273972603,
+  "pad": 7,
+  "grid_cols": 4,
+  "grid_rows": 7,
+  "area": "Inventory_Area"
+}

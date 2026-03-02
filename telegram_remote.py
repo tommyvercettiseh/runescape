@@ -10,6 +10,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, ContextTyp
 from pynput.keyboard import Controller as KeyboardController
 
 
+BOT_TOKEN = "8031171388:AAF5_H7Rs7X_UspAJc70D8I75qvn7XLqsck"
+CHAT_ID = 8253849447  # <-- jouw chat id (int)
 
 keyboard = KeyboardController()
 

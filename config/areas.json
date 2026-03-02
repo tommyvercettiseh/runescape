@@ -547,5 +547,14 @@
       322
     ],
     "group": "Skilling"
+  },
+  "Prayer": {
+    "coords": [
+      598,
+      114,
+      629,
+      135
+    ],
+    "group": "Basic"
   }
 }

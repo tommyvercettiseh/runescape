@@ -1,0 +1,17 @@
+{
+  "session_id": "2026-03-01_142249",
+  "created_local": "2026-03-01 14:22:49",
+  "mode": "FREE_ROAM",
+  "sampling_ms": 8,
+  "polling_hz": 125,
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.13.1",
+  "screen_w": 0,
+  "screen_h": 0,
+  "window_w": 0,
+  "window_h": 0,
+  "dpi": 1.0,
+  "protocol": {
+    "type": "free_roam"
+  }
+}

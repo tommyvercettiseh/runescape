@@ -14,18 +14,35 @@ try:
 except ImportError:
     raise SystemExit("pip install mss")
 
-from pynput.keyboard import Key, Controller
+# ============================================================
+# BOOTSTRAP (start anywhere)
+# zoekt project root met /core en /config
+# ============================================================
+HERE = Path(__file__).resolve()
+ROOT = None
+for p in [HERE] + list(HERE.parents):
+    if (p / "core").exists() and (p / "config").exists():
+        ROOT = p
+        break
 
-ROOT = Path(__file__).resolve().parents[1]
+if ROOT is None:
+    raise SystemExit("❌ Project root niet gevonden (map met 'core' en 'config').")
+
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# ============================================================
+# IMPORTS (project)
+# ============================================================
 from core.bot_offsets import get_offset
-from core.ai_cursor import move_and_click
+from core.ai_mouse.ai_mouse import human_move_to, human_click
+
+from core.ai_keyboard.ai_keyboard_executor import KeyboardExecutor, resolve_key
+from core.ai_keyboard.ai_keyboard_settings import get_keyboard_config
+
 from vision.image_detection import detect_images
 from helpers.ops import wait_until
 from helpers.log import log
-
 
 # =========================
 # CONFIG (pas dit aan)
@@ -43,32 +60,15 @@ GRID_ROWS = 7
 
 INVENTORY_AREA = "Inventory_Area"
 
-FOCUS_AREA = "Chat_Area"       # ✅ focus click hier (pas aan als je wil)
-SHIFT_PRESS_DELAY = 0.10       # ✅ meer marge zodat shift zeker “pakt”
-SHIFT_REFRESH_EVERY = 8        # ✅ soms verliest Windows focus/shift, refresh af en toe
-SHIFT_REFRESH_DELAY = 0.02
+FOCUS_AREA = "Chat_Area"       # focus click hier (pas aan als je wil)
 
-CLICK_PAD_PX = 6               # ✅ klik niet exact op rand/center
-STABLE_CLICK_DELAY = 0.0       # ✅ geen extra delay in click itself
-STABLE_CLICK_HOLD_MIN = 0.006  # ✅ kort vasthouden voorkomt drag
-STABLE_CLICK_HOLD_MAX = 0.014
+CLICK_PAD_PX = 6               # klik niet exact op rand
 
 # =========================
 # PATTERN CONFIG
 # =========================
-PATTERNS = ("E", "3", "W", "N")   # ✅ jouw 4 patronen
-AUTO_PATTERN = "AUTO"            # ✅ speciale waarde voor automatisch kiezen
-
-
-# =========================
-# KEYBOARD (ai_keyboard)
-# =========================
-def _get_keyboard_controller():
-    try:
-        from core.ai_keyboard import keyboard as kb  # type: ignore
-        return kb
-    except Exception:
-        return Controller()
+PATTERNS = ("E", "3", "W", "N")
+AUTO_PATTERN = "AUTO"
 
 
 # =========================
@@ -202,54 +202,16 @@ def focus_client(*, bot_id: int, area_name: str = FOCUS_AREA, delay_s: float = 0
     x1, y1, x2, y2 = _xyxy_for_area(data, area_name, bot_id)
     cx, cy = _slot_center(x1, y1, x2, y2)
 
-    try:
-        from core.ai_cursor import ClickConfig, SettleConfig  # type: ignore
-        move_and_click(
-            (cx, cy),
-            button="left",
-            click_cfg=ClickConfig(
-                delay=STABLE_CLICK_DELAY,
-                button="left",
-                mode="safe_tap",
-                tap_min_s=STABLE_CLICK_HOLD_MIN,
-                tap_max_s=STABLE_CLICK_HOLD_MAX,
-                lock_pos=True,
-            ),
-            settle=SettleConfig(chance=0.0),
-            rand_cfg=None,
-        )
-    except Exception:
-        move_and_click((cx, cy), button="left")
+    human_move_to(cx, cy)
+    human_click(mode="safe_tap")
 
     time.sleep(float(delay_s))
 
 
 def stable_click(xy, *, button="left"):
-    try:
-        from core.ai_cursor import ClickConfig, SettleConfig  # type: ignore
-        move_and_click(
-            (int(xy[0]), int(xy[1])),
-            button=button,
-            click_cfg=ClickConfig(
-                delay=STABLE_CLICK_DELAY,
-                button=button,
-                mode="safe_tap",
-                tap_min_s=STABLE_CLICK_HOLD_MIN,
-                tap_max_s=STABLE_CLICK_HOLD_MAX,
-                lock_pos=True,
-            ),
-            settle=SettleConfig(chance=0.0),
-            rand_cfg=None,
-        )
-    except Exception:
-        move_and_click((int(xy[0]), int(xy[1])), button=button)
-
-
-def refresh_shift(keyboard):
-    keyboard.release(Key.shift)
-    time.sleep(float(SHIFT_REFRESH_DELAY))
-    keyboard.press(Key.shift)
-    time.sleep(0.03)
+    x, y = int(xy[0]), int(xy[1])
+    human_move_to(x, y)
+    human_click(button=button, mode="safe_tap")
 
 
 def _human_click_delay(min_s: float, max_s: float, jitter: float = 0.0) -> float:
@@ -259,7 +221,6 @@ def _human_click_delay(min_s: float, max_s: float, jitter: float = 0.0) -> float
         a, b = b, a
 
     base = random.uniform(a, b)
-
     if jitter and float(jitter) > 0:
         base += random.uniform(-float(jitter), float(jitter))
 
@@ -274,15 +235,6 @@ def build_slot_order(
     grid_rows=7,
     seed=None,
 ):
-    """
-    Slot-order patronen (1..total_slots)
-
-    "E"  rij voor rij links naar rechts
-    "3"  rij voor rij rechts naar links
-    "W"  snake per rij
-    "N"  snake per kolom
-    "R"  random shuffle
-    """
     p = (pattern or "E").strip().upper()
 
     if seed is not None:
@@ -348,6 +300,23 @@ def _resolve_pattern(pattern, *, allow_random=True):
     return "E"
 
 
+# ============================================================
+# SHIFT HOLD (ai_keyboard timing)
+# ============================================================
+def _shift_hold_start(ex: KeyboardExecutor, *, scenario_label: str | None = "shift_hold") -> None:
+    cfg = get_keyboard_config(scenario_label).behavior
+    k = resolve_key("shift")
+    ex.press(k)
+    time.sleep(random.uniform(float(cfg.press_min_s), float(cfg.press_max_s)))
+
+
+def _shift_hold_end(ex: KeyboardExecutor, *, scenario_label: str | None = "shift_hold") -> None:
+    cfg = get_keyboard_config(scenario_label).behavior
+    k = resolve_key("shift")
+    time.sleep(random.uniform(float(cfg.press_min_s) * 0.5, float(cfg.press_max_s) * 0.9))
+    ex.release(k)
+
+
 # =========================
 # MAIN
 # =========================
@@ -392,10 +361,12 @@ def drop_inventory(
     trace_depth=6,
     debug=True,
 
-    # ✅ nieuw, maar volledig backwards compatible
-    pattern=AUTO_PATTERN,       # standaard auto random
-    pattern_seed=None,          # alleen relevant bij "R"
-    allow_random_pattern=True,  # zet op False als je altijd vaste order wil
+    pattern=AUTO_PATTERN,
+    pattern_seed=None,
+    allow_random_pattern=True,
+
+    # timing label voor ai_keyboard
+    shift_scenario_label="shift_hold",
 ):
     if seed is not None:
         random.seed(seed)
@@ -464,14 +435,15 @@ def drop_inventory(
     skipped = 0
     consec_skips = 0
 
-    keyboard = _get_keyboard_controller()
-
-    if use_shift_drop and not dry_run:
-        focus_client(bot_id=bot_id, area_name=FOCUS_AREA, delay_s=0.10)
-        keyboard.press(Key.shift)
-        time.sleep(float(SHIFT_PRESS_DELAY))
+    # 1 executor voor de hele run (stabiel)
+    kb_ex = KeyboardExecutor()
 
     try:
+        # SHIFT CONTINUE HOLD ✅
+        if use_shift_drop and not dry_run:
+            focus_client(bot_id=bot_id, area_name=FOCUS_AREA, delay_s=0.10)
+            _shift_hold_start(kb_ex, scenario_label=shift_scenario_label)
+
         order_seed = pattern_seed if (chosen_pattern == "R") else None
         order = build_slot_order(
             chosen_pattern,
@@ -486,7 +458,7 @@ def drop_inventory(
             if i < 0 or i >= len(states):
                 continue
 
-            _, icon, pct, empty, is_ex = states[i]
+            _, _, pct, empty, is_ex = states[i]
 
             if is_ex or empty:
                 continue
@@ -496,18 +468,10 @@ def drop_inventory(
                 skipped += 1
                 consec_skips += 1
                 if debug:
-                    log(
-                        verbose,
-                        f"🙈 Skipped action | Slot={idx} | Consecutive={consec_skips}",
-                        trace,
-                        depth=trace_depth,
-                    )
+                    log(verbose, f"🙈 Skipped action | Slot={idx} | Consecutive={consec_skips}", trace, depth=trace_depth)
                 continue
 
             consec_skips = 0
-
-            if use_shift_drop and not dry_run and SHIFT_REFRESH_EVERY and (idx % int(SHIFT_REFRESH_EVERY) == 0):
-                refresh_shift(keyboard)
 
             x1, y1, x2, y2 = slots_xyxy[i]
             cx, cy = _rand_point_in_xyxy(x1, y1, x2, y2, pad=CLICK_PAD_PX)
@@ -533,8 +497,7 @@ def drop_inventory(
 
     finally:
         if use_shift_drop and not dry_run:
-            keyboard.release(Key.shift)
-            time.sleep(0.02)
+            _shift_hold_end(kb_ex, scenario_label=shift_scenario_label)
 
     if debug:
         log(
@@ -553,7 +516,6 @@ if __name__ == "__main__":
         bot_id=1,
         dry_run=False,
 
-        # 🧠 variabele delay (aanrader)
         click_delay_min=0.09,
         click_delay_max=0.17,
         click_delay_jitter=0.015,
@@ -562,7 +524,6 @@ if __name__ == "__main__":
 
         skip_chance=0.09,
         max_consecutive_skips=2,
-        seed=None,
 
         bg_ranges=BG_RANGES,
         empty_threshold=0.90,
@@ -578,7 +539,8 @@ if __name__ == "__main__":
         timeout=1.0,
         interval=0.25,
 
-        # ✅ nieuw
-        pattern="AUTO",            # kiest random uit E 3 W N
-        allow_random_pattern=True, # zet op False om vaste order te forceren
+        pattern="AUTO",
+        allow_random_pattern=True,
+
+        shift_scenario_label="shift_hold",
     )

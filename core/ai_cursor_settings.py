@@ -1,153 +1,114 @@
-﻿#===========================================================================
-# ai_cursor_settings.py ✅ (Single Source of Truth)
-#===========================================================================
-# Doel:
-# 1) Oude defaults blijven werken (oude manier)
-# 2) 1 switch om over te stappen op persoonlijk profiel
-# 3) Tweedeling:
-#    behavior -> ai_cursor.py (settle, click, overshoot, tremor, etc)
-#    motion   -> ai_cursor_movement.py (pad, timing, jitter, steps, etc)
-#
-# Gebruik:
-#   PERSONAL_PROFILE = False  -> altijd defaults
-#   PERSONAL_PROFILE = True   -> profile.json (waar aanwezig) override defaults
-#
-# Profile file:
-#   PROFILE_PATH = "mouse_profile/profile_all_time.json"
-#===========================================================================
-
+﻿# core/ai_cursor_settings.py
 from __future__ import annotations
-from dataclasses import dataclass
-from pathlib import Path
+
 import json
-from typing import Optional, Dict, Any
+from pathlib import Path
+from typing import Any, Dict, Optional
 
+# 1) Default profiel (fallback)
+mouse_profile: Dict[str, float] = {
+    # movement-side
+    "speed_min": 700,
+    "speed_max": 1500,
+    "overshoot_min": 4,
+    "overshoot_max": 22,
+    "drift_scale": 0.0007,
+    "micro_tremor_max": 0.22,
+    "step_micro_pause_chance": 0.006,
+    "step_long_pause_chance": 0.0012,
 
-#===========================================================================
-# Settings profile (TOP SWITCH) 🎛️
-#===========================================================================
-PERSONAL_PROFILE = False
-PROFILE_PATH = Path("mouse_profile/profile_all_time.json")
+    # ai_cursor-side
+    "pre_click_s": 0.085,
+    "click_hold_s": 0.035,
+    "close_px": 2.0,
+    "settle_s": 0.065,
+}
 
-# Optioneel: per scenario overrides (zonder profile file)
-# Bijvoorbeeld: SCENARIO_OVERRIDES["PRECISION_SMALL"]["behavior"]["overshoot_max_px"]=38
-SCENARIO_OVERRIDES: Dict[str, Dict[str, Dict[str, Any]]] = {}
-
-
-#===========================================================================
-# Data models 🧩
-#===========================================================================
-@dataclass(frozen=True)
-class BehaviorConfig:
-    # click / settle / micro
-    settle_chance: float = 0.86
-    settle_min_s: float = 0.05
-    settle_max_s: float = 0.22
-    settle_long_chance: float = 0.11
-    settle_long_min_s: float = 0.28
-    settle_long_max_s: float = 1.10
-
-    # overshoot / undershoot / pre-click nudge
-    overshoot_chance: float = 0.22
-    overshoot_min_px: int = 6
-    overshoot_max_px: int = 22
-
-    undershoot_chance: float = 0.18
-
-    pre_click_chance: float = 0.42
-    pre_click_px_min: int = 1
-    pre_click_px_max: int = 4
-
-    # tail feel
-    micro_pause_chance: float = 0.35
-    tremor_chance: float = 0.35
-    tremor_px_min: int = 1
-    tremor_px_max: int = 4
-
-    # persona / speed
-    persona: Optional[str] = None         # "precise" | "fast" | "careful" | "distracted"
-    speed_mult: float = 1.0              # multiplies speed_pct in ai_cursor
-
-
-@dataclass(frozen=True)
-class MotionConfig:
-    # Movement-only tuning (ai_cursor_movement)
-    # Houd dit bewust compact: alleen dingen die écht het pad/timing bepalen.
-    # Als je movement module nog geen tuning ondersteunt: later mappen we dit 1-op-1.
-    target_hz: float = 125.0
-    steps_min: int = 18
-    steps_max: int = 48
-    jitter_px: float = 0.8
-    accel_bias: float = 0.15
-    decel_bias: float = 0.55
-
-    # Belangrijk: overshoot in movement uit, omdat behavior het regelt
-    movement_overshoot_chance: float = 0.0
-
-
-@dataclass(frozen=True)
-class CursorConfig:
-    behavior: BehaviorConfig = BehaviorConfig()
-    motion: MotionConfig = MotionConfig()
-
-
-#===========================================================================
-# Helpers 🔧
-#===========================================================================
-def _read_json(path: Path) -> Optional[dict]:
+def _as_float(x: Any) -> Optional[float]:
     try:
-        if not path.exists():
-            return None
-        return json.loads(path.read_text(encoding="utf-8"))
+        return float(x)
     except Exception:
         return None
 
-
-def _merge_dict_into_dataclass(dc_obj, patch: Dict[str, Any]):
-    # Only apply keys that exist on the dataclass
-    data = dc_obj.__dict__.copy()
-    for k, v in patch.items():
-        if k in data and v is not None:
-            data[k] = v
-    return dc_obj.__class__(**data)
-
-
-def _get_profile() -> Optional[dict]:
-    if not PERSONAL_PROFILE:
+def _stat(d: dict, key: str, which: str) -> Optional[float]:
+    """
+    master_profile.json shape:
+      globals -> <metric> -> {p10,p50,p90,...}
+    """
+    try:
+        blk = d["globals"][key]
+        return _as_float(blk.get(which))
+    except Exception:
         return None
-    return _read_json(PROFILE_PATH)
 
-
-#===========================================================================
-# Public API ✅
-#===========================================================================
-def get_cursor_config(scenario_label: Optional[str] = None) -> CursorConfig:
+def load_mouse_profile(profile_path: str | Path) -> Dict[str, float]:
     """
-    Returns:
-      CursorConfig(behavior=..., motion=...)
-    Merge order:
-      defaults -> profile.json (if PERSONAL_PROFILE True) -> scenario overrides
+    Laadt een mouse profile JSON dat al "knobs" bevat (speed_min, pre_click_s, etc.)
+    en merged met defaults.
     """
-    cfg = CursorConfig()
+    p = Path(profile_path)
+    data: Dict[str, Any] = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return mouse_profile
 
-    prof = _get_profile()
-    if isinstance(prof, dict):
-        # profile layout suggestion:
-        # { "behavior": {...}, "motion": {...} }
-        if isinstance(prof.get("behavior"), dict):
-            b = _merge_dict_into_dataclass(cfg.behavior, prof["behavior"])
-            cfg = CursorConfig(behavior=b, motion=cfg.motion)
-        if isinstance(prof.get("motion"), dict):
-            m = _merge_dict_into_dataclass(cfg.motion, prof["motion"])
-            cfg = CursorConfig(behavior=cfg.behavior, motion=m)
+    merged = dict(mouse_profile)
+    for k, v in data.items():
+        fv = _as_float(v)
+        if fv is not None:
+            merged[k] = fv
 
-    if scenario_label and scenario_label in SCENARIO_OVERRIDES:
-        over = SCENARIO_OVERRIDES[scenario_label]
-        if isinstance(over.get("behavior"), dict):
-            b = _merge_dict_into_dataclass(cfg.behavior, over["behavior"])
-            cfg = CursorConfig(behavior=b, motion=cfg.motion)
-        if isinstance(over.get("motion"), dict):
-            m = _merge_dict_into_dataclass(cfg.motion, over["motion"])
-            cfg = CursorConfig(behavior=cfg.behavior, motion=m)
+    mouse_profile.clear()
+    mouse_profile.update(merged)
+    return mouse_profile
 
-    return cfg
+def load_master_profile(master_path: str | Path) -> Dict[str, float]:
+    """
+    Laadt master_profile.json (stats: p10/p50/p90) en mapt naar runtime knobs.
+    """
+    p = Path(master_path)
+    mp: Dict[str, Any] = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(mp, dict) or "globals" not in mp:
+        return mouse_profile
+
+    merged = dict(mouse_profile)
+
+    # 1) SPEED
+    # In master_profile heb je o.a. max_speed_px_s (p10/p90) die veel dichter bij "move snelheid" ligt
+    # dan median_speed (die wordt omlaag getrokken door pauses/settle).
+    s_min = _stat(mp, "max_speed_px_s", "p10")
+    s_max = _stat(mp, "max_speed_px_s", "p90")
+    if s_min is not None and s_max is not None:
+        merged["speed_min"] = max(150.0, s_min * 0.55)   # conservatief: niet 1:1 piek
+        merged["speed_max"] = max(merged["speed_min"] + 50.0, s_max * 0.70)
+
+    # 2) OVERSHOOT
+    o_min = _stat(mp, "overshoot_px", "p10")
+    o_max = _stat(mp, "overshoot_px", "p90")
+    if o_min is not None:
+        merged["overshoot_min"] = max(1.0, o_min * 0.70)
+    if o_max is not None:
+        merged["overshoot_max"] = max(merged["overshoot_min"] + 1.0, o_max * 0.95)
+
+    # 3) PRE-CLICK (ms → s)
+    pre_ms = _stat(mp, "pre_click_ms", "p50")
+    if pre_ms is not None:
+        merged["pre_click_s"] = max(0.0, pre_ms / 1000.0)
+
+    # 4) CLICK HOLD (ms → s)
+    # Staat bij jou nu 0.0 in master_profile, dus we only set als het > 0 is.
+    hold_ms = _stat(mp, "click_hold_ms", "p50")
+    if hold_ms is not None and hold_ms > 0.0:
+        merged["click_hold_s"] = max(0.006, min(0.22, hold_ms / 1000.0))
+
+    # 5) Settle en close radius kun je uit tail_time / end_error afleiden (optioneel)
+    tail_ms = _stat(mp, "tail_time_ms", "p50")
+    if tail_ms is not None:
+        merged["settle_s"] = max(0.02, min(0.25, tail_ms / 1000.0))
+
+    end_err = _stat(mp, "end_radial_error", "p50")
+    if end_err is not None:
+        merged["close_px"] = max(1.0, min(12.0, end_err * 0.35))
+
+    mouse_profile.clear()
+    mouse_profile.update(merged)
+    return mouse_profile

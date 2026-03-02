@@ -1,19 +1,15 @@
-from helpers.trace import trace as _trace
+ANSI = True
 
+def _c(code):
+    return f"\x1b[{code}m" if ANSI else ""
 
-def log(verbose, msg, trace=False, depth=3):
+RESET = _c("0")
+GREEN = _c("32")
+RED = _c("31")
+YELLOW = _c("33")
+CYAN = _c("36")
+
+def log(verbose, msg, trace=False, depth=0):
     if not verbose:
         return
-    print(f"{msg}{_trace(trace, depth=depth)}")
-
-def _log_not_found(image_name, area_name, trace=False, trace_depth=5, elapsed=None, **_):
-    # elapsed en extra kwargs zijn optioneel, zodat detect_image nooit crasht op logging
-    if elapsed is None:
-        msg = f"❌ Not found: {image_name} in {area_name}"
-    else:
-        msg = f"❌ Not found: {image_name} in {area_name} | {elapsed:.2f}s"
-
-    # jouw bestaande log/trace hier laten staan
-    # bijv:
-    # log(True, msg, trace=trace, depth=trace_depth)
-    print(msg) if trace else None
+    print(msg)

@@ -29,7 +29,8 @@
   "Login_Screen_World.png": {
     "method": "TM_CCOEFF_NORMED",
     "min_shape": 95.0,
-    "min_color": 95.0
+    "min_color": 85.0,
+    "area": "Bot_Area_Full"
   },
   "Login_Screen_Play_Now.png": {
     "method": "TM_CCOEFF_NORMED",
@@ -383,12 +384,6 @@
     "min_color": 95.0,
     "area": "Inventory_Area"
   },
-  "USe.png": {
-    "method": "TM_CCOEFF_NORMED",
-    "min_shape": 97.0,
-    "min_color": 90.0,
-    "area": "Inventory_Area"
-  },
   "Firemaking_Continue.png": {
     "method": "TM_SQDIFF_NORMED",
     "min_shape": 90.0,
@@ -616,5 +611,11 @@
     "min_shape": 95.0,
     "min_color": 95.0,
     "area": "Chat_Area"
+  },
+  "Use.png": {
+    "method": "TM_CCOEFF_NORMED",
+    "min_shape": 97.0,
+    "min_color": 90.0,
+    "area": "Inventory_Area"
   }
 }

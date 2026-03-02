@@ -1,60 +1,77 @@
 ﻿from __future__ import annotations
 
-import sys
 import random
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
 from core.click_image import click_image
 from vision.image_detection import detect_image
+
+
+"""
+============================================================
+ACTION: EAT FOOD 🍗
+============================================================
+Doel
+  Probeert 1 eetbaar item in de inventory te klikken.
+
+Interface
+  bot_id       : welke bot/client
+  item_images  : lijst met mogelijke food images (optional)
+  area         : inventory area naam
+  verbose      : prints aan/uit
+
+Return
+  True  = gegeten
+  False = niets gevonden
+
+Regels
+  Pure action: geen sensors, geen state, geen hp checks.
+  Alleen detect → click → resultaat.
+============================================================
+"""
 
 
 def eat_food(
     *,
     bot_id=1,
-    Item_images=None,
+    item_images=None,
     area="Inventory_Area",
-    attempts=3,
-    verbose=True,
+    verbose=False,
 ):
-    """
-    Klikt het eerste eetbare item dat gevonden wordt.
-    Ontbrekende images worden netjes overgeslagen.
-    """
+    default_items = [
+        "Item_Shrimp.png",
+        "Item_Trout.png",
+        "Item_Salmon.png",
+        "Item_Lobster.png",
+        "Item_Swordfish.png",
+        "Item_Monkfish.png",
+        "Item_Shark.png",
+    ]
 
-    if not Item_images:
-        Item_images = [
-            "Item_Shrimp.png",
-            "Item_Trout.png",
-            "Item_Salmon.png",
-            "Item_Lobster.png",
-            "Item_Swordfish.png",
-            "Item_Monkfish.png",
-            "Item_Shark.png",
-        ]
+    items = list(item_images) if item_images else list(default_items)
+    random.shuffle(items)
 
-    verbose and print("⏳  🍗  Zoeken naar voedsel")
+    if verbose:
+        print("⏳  🍗  Zoeken naar voedsel")
 
-    for attempt in range(int(attempts)):
-        random.shuffle(Item_images)
-        verbose and print(f"⏳  🍗  Poging {attempt + 1}/{attempts}")
+    for img in items:
+        try:
+            found = detect_image(img, area, bot_id=bot_id, verbose=False)
+        except FileNotFoundError:
+            if verbose:
+                print(f"⚠️  🖼️  Image ontbreekt | {img}")
+            continue
 
-        for img in Item_images:
-            try:
-                found = detect_image(img, area, bot_id, verbose=False)
-            except FileNotFoundError:
-                verbose and print(f"⚠️  🖼️  Image ontbreekt     | {img}")
-                continue
+        if not found:
+            continue
 
-            if found:
-                verbose and print(f"✅  🍗  Gegeten             | {img}")
-                click_image(img, area, bot_id, verbose=False)
-                return True
+        if verbose:
+            print(f"✅  🍗  Gegeten | {img}")
 
-    verbose and print("❌  🍗  Geen voedsel gevonden")
+        click_image(img, area, bot_id=bot_id, verbose=False)
+        return True
+
+    if verbose:
+        print("❌  🍗  Geen voedsel gevonden")
+
     return False
 
 
@@ -62,19 +79,16 @@ def eat_food(
 # TEST 🧪
 # ============================================================
 if __name__ == "__main__":
-    BOT_ID = 1
-
     print("🧪  Test eat_food\n")
 
     result = eat_food(
-        bot_id=BOT_ID,
-        Item_images=[
+        bot_id=1,
+        item_images=[
             "Item_Trout.png",
             "Item_Salmon.png",
             "Item_Lobster.png",
         ],
         area="Inventory_Area",
-        attempts=2,
         verbose=True,
     )
 

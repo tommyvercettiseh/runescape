@@ -8,19 +8,21 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.ai_cursor import move_and_click
+# ✅ NEW: gebruik ai_mouse i.p.v. ai_cursor.move_and_click
+from core.ai_mouse import human_move_to, human_click
+
 from vision.image_detection import detect_images
 from helpers.log import log
 
 
-def _normalize_png(name):
+def _normalize_png(name: str) -> str:
     name = (name or "").strip()
     if not name:
         return name
     return name if name.lower().endswith(".png") else name + ".png"
 
 
-def _rand_point_in_hit(hit, padding):
+def _rand_point_in_hit(hit, padding: int):
     x = int(getattr(hit, "x", 0))
     y = int(getattr(hit, "y", 0))
     w = int(getattr(hit, "width", 1))
@@ -41,9 +43,20 @@ def _rand_point_in_hit(hit, padding):
     return cx, cy
 
 
-def _first_hit(img, area_name, bot_id, max_hits=1):
+def _first_hit(img: str, area_name: str, bot_id: int, max_hits: int = 1):
     hits = detect_images(img, area_name, bot_id=bot_id, verbose=False, max_hits=max_hits) or []
     return hits
+
+
+def _ai_mouse_move_and_click(
+    point,
+    *,
+    button: str = "left",
+):
+    # ai_mouse werkt met human_move_to + human_click
+    x, y = int(point[0]), int(point[1])
+    human_move_to(x, y)
+    human_click(button=button, mode="safe_tap")
 
 
 def click_image(
@@ -59,7 +72,6 @@ def click_image(
 ):
     img = _normalize_png(image_name)
 
-    # ✅ exact dezelfde detect pipeline als click_random_image
     hits = _first_hit(img, area_name, bot_id, max_hits=1)
     if not hits:
         log(verbose, f"⚠️ click_image geen hit | img={img} area={area_name} bot={bot_id}", trace, depth=trace_depth)
@@ -78,7 +90,7 @@ def click_image(
             extra += f" kleur={kleur:.2f}"
         log(verbose, f"🖱️ click_image | img={img} area={area_name} bot={bot_id} @ ({cx},{cy}){extra}", trace, depth=trace_depth)
 
-    move_and_click((cx, cy), button=button)
+    _ai_mouse_move_and_click((cx, cy), button=button)
 
     if debug:
         log(verbose, "✅ click_image done", trace, depth=trace_depth)
@@ -107,7 +119,7 @@ def click_random_image(
 
     hits = _first_hit(img, area_name, bot_id, max_hits=max_hits)
     if not hits:
-        log(verbose, f"⚠️ click_random_image geen hits | img={img} area={area_name} bot={bot_id}", trace, depth=trace_depth)
+        log(verbose, f"⚠️ Click_random_image geen hits | img={img} area={area_name} bot={bot_id}", trace, depth=trace_depth)
         return None
 
     hit = random.choice(hits)
@@ -125,7 +137,7 @@ def click_random_image(
         log(verbose, f"🎯 Random hit | img={img} | Mode={mode} | Pos=({cx},{cy}){extra}", trace, depth=trace_depth)
 
     if not dry_run:
-        move_and_click((cx, cy), button=button)
+        _ai_mouse_move_and_click((cx, cy), button=button)
 
     return (cx, cy)
 
