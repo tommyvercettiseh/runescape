@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import random
 from pathlib import Path
 
 from tools.mouse_profile_hub.services import (
@@ -14,6 +15,13 @@ from tools.mouse_profile_hub.services import (
     normalize_path,
     set_session_included,
     similarity_score,
+)
+from tools.mouse_profile_hub.stress_lab import (
+    RunMetrics,
+    analyze_runs,
+    run_stress_test,
+    save_report,
+    simulate_variant,
 )
 
 
@@ -43,8 +51,26 @@ def _write_session(root: Path, name: str = "gaming/run1", duration: int = 1458) 
         writer = csv.writer(handle)
         writer.writerow(["timestamp", "x", "y"])
         for i in range(100):
-            writer.writerow([i * 0.01, i * 3, 100 + i])
+            writer.writerow([i * 0.01, i * 3, 100 + i + (i % 7)])
     return session
+
+
+def _paths(tmp_path: Path) -> HubPaths:
+    recordings = tmp_path / "tools" / "mouse_lab" / "recordings"
+    data = tmp_path / "data" / "mouse_profile_hub"
+    paths = HubPaths(
+        repo_root=tmp_path,
+        mouse_lab=tmp_path / "tools" / "mouse_lab",
+        recordings=recordings,
+        master_profile=recordings / "master_profile.json",
+        runtime_profile=tmp_path / "master_profile.json",
+        state_file=data / "session_state.json",
+        logs=data / "logs",
+        profile_history=data / "profile_history",
+    )
+    for folder in (recordings, paths.logs, paths.profile_history):
+        folder.mkdir(parents=True, exist_ok=True)
+    return paths
 
 
 def test_discover_sessions_reads_profile_and_points(tmp_path: Path):
@@ -103,21 +129,9 @@ def test_profile_replay_preserves_endpoints():
 
 
 def test_build_master_exports_runtime_profile(tmp_path: Path):
-    recordings = tmp_path / "tools" / "mouse_lab" / "recordings"
-    _write_session(recordings)
-    data = tmp_path / "data" / "mouse_profile_hub"
-    paths = HubPaths(
-        repo_root=tmp_path,
-        mouse_lab=tmp_path / "tools" / "mouse_lab",
-        recordings=recordings,
-        master_profile=recordings / "master_profile.json",
-        runtime_profile=tmp_path / "master_profile.json",
-        state_file=data / "session_state.json",
-        logs=data / "logs",
-        profile_history=data / "profile_history",
-    )
-    paths.profile_history.mkdir(parents=True)
-    sessions = discover_sessions(recordings)
+    paths = _paths(tmp_path)
+    _write_session(paths.recordings)
+    sessions = discover_sessions(paths.recordings)
     master = build_master_profile(paths, sessions)
     runtime = load_master_profile(paths.runtime_profile)
     assert master["profile_version"] == "0.1.0"
@@ -128,3 +142,56 @@ def test_build_master_exports_runtime_profile(tmp_path: Path):
 
 def test_load_master_profile_missing_is_empty(tmp_path: Path):
     assert load_master_profile(tmp_path / "missing.json") == {}
+
+
+def test_stress_variant_is_seeded_and_preserves_endpoints():
+    reference = [(i / 63.0, 0.5 + 0.2 * ((i % 9) / 9.0)) for i in range(64)]
+    first = simulate_variant(reference, random.Random(42))
+    second = simulate_variant(reference, random.Random(42))
+    third = simulate_variant(reference, random.Random(43))
+    assert first == second
+    assert first != third
+    assert first[0] == reference[0]
+    assert first[-1] == reference[-1]
+
+
+def test_stress_analysis_penalizes_repeated_fingerprints():
+    runs = [
+        RunMetrics(i, "session", 95.0, 1000.0 + i, 1.2, 0.8, 0.1, 0.05, 0.01, 0.01, "same")
+        for i in range(1, 21)
+    ]
+    report = analyze_runs(runs, source_count=1, seed=1, elapsed=0.1, profile={"profile_id": "test"})
+    assert report.category_scores["repetition_control"] < 10
+    assert any("repeated" in warning["message"].lower() for warning in report.warnings)
+
+
+def test_stress_test_generates_unique_runs_and_report_files(tmp_path: Path):
+    paths = _paths(tmp_path)
+    _write_session(paths.recordings, "gaming/run1")
+    _write_session(paths.recordings, "precision/run2", duration=900)
+    sessions = discover_sessions(paths.recordings, paths.state_file)
+    build_master_profile(paths, sessions)
+
+    report = run_stress_test(paths, run_count=40, seed=123)
+    assert report.run_count == 40
+    assert report.source_session_count == 2
+    assert 0 <= report.overall_score <= 100
+    assert len({run.fingerprint for run in report.runs}) > 30
+    assert report.category_scores["profile_similarity"] > 70
+
+    folder = save_report(paths, report)
+    payload = json.loads((folder / "report.json").read_text(encoding="utf-8"))
+    lines = (folder / "runs.jsonl").read_text(encoding="utf-8").splitlines()
+    assert payload["run_count"] == 40
+    assert len(lines) == 40
+
+
+def test_stress_test_requires_master_profile(tmp_path: Path):
+    paths = _paths(tmp_path)
+    _write_session(paths.recordings)
+    try:
+        run_stress_test(paths, run_count=10, seed=1)
+    except FileNotFoundError as exc:
+        assert "master profile" in str(exc).lower()
+    else:
+        raise AssertionError("Expected missing master profile error")
