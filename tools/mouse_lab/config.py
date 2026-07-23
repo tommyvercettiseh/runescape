@@ -1,14 +1,14 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # ============================================================
 # Mouse Lab: Hes Signature Protocol ✅ (split version)
 # ============================================================
 
-ROOT = Path(__file__).resolve().parent  # .../tools/mouse_lab
+ROOT = Path(__file__).resolve().parent
 BASE_DIR = ROOT / "recordings"
-
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 BG = "#101010"
@@ -27,7 +27,9 @@ TOPBAR_H = 104
 SAMPLE_MS = 8
 MOVE_EVENT_EVERY_N = 1
 
-MODE = "NORMAL"
+# The profile hub supplies this environment value. Direct Mouse Lab starts
+# remain backwards-compatible and use NORMAL.
+MODE = (os.getenv("MOUSE_LAB_LABEL") or "NORMAL").strip().upper()
 
 STOP_SPEED_PX_S = 30.0
 PAUSE_DT_MS = 22.0
@@ -41,10 +43,7 @@ PHASE1_REPS = 30
 PHASE2_REPS = 36
 PHASE3_BLOCKS = 16
 
-# ============================================================
-# Point tuple indices (kept identical)
-# ============================================================
-
+# Point tuple indices
 P_TS = 0
 P_X = 1
 P_Y = 2
