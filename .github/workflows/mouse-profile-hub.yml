@@ -7,6 +7,7 @@ on:
       - "tools/mouse_lab/config.py"
       - "tests/test_mouse_profile_hub.py"
       - "Start Input Profile Hub.bat"
+      - "Start Profile Stress Lab.bat"
       - ".github/workflows/mouse-profile-hub.yml"
   push:
     branches: [main]
@@ -14,6 +15,8 @@ on:
       - "tools/mouse_profile_hub/**"
       - "tools/mouse_lab/config.py"
       - "tests/test_mouse_profile_hub.py"
+      - "Start Input Profile Hub.bat"
+      - "Start Profile Stress Lab.bat"
 
 jobs:
   test:
