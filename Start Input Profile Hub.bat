@@ -34,7 +34,7 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
-".venv\Scripts\python.exe" -c "import tkinter; import tools.mouse_profile_hub.main" >>"%BOOT_LOG%" 2>&1
+".venv\Scripts\python.exe" -c "import tkinter; import tools.mouse_profile_hub.runner" >>"%BOOT_LOG%" 2>&1
 if errorlevel 1 (
     echo [Input Hub] Startup check failed.
     echo Your Python installation may be missing Tkinter, or a project file has an error.
@@ -44,7 +44,7 @@ if errorlevel 1 (
 )
 
 echo [Input Hub] Starting...
-".venv\Scripts\python.exe" -m tools.mouse_profile_hub.main >>"%BOOT_LOG%" 2>&1
+".venv\Scripts\python.exe" -m tools.mouse_profile_hub.runner >>"%BOOT_LOG%" 2>&1
 set "EXIT_CODE=%errorlevel%"
 
 if not "%EXIT_CODE%"=="0" (
