@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.0
+
+### Added
+
+• Profile Stress Lab voor 10 tot 5000 versnelde batchruns
+• Reproduceerbare simulaties met instelbare seed
+• Scores voor profielovereenkomst, variatie, continuïteit, timing, herhaling, fysieke plausibiliteit en outliers
+• Detectie van herhaalde pad-fingerprints en abrupte bewegingen
+• JSON-hoofdrapport plus JSONL-bestand met iedere afzonderlijke run
+• Eigen Windows-launcher: `Start Profile Stress Lab.bat`
+• Automatische opslag onder `data/mouse_profile_hub/stress_lab/`
+• CI-tests voor reproduceerbaarheid, unieke runs, scoregrenzen en rapportbestanden
+
+### Changed
+
+• Projectversie verhoogd naar 0.2.0 vanwege de nieuwe Stress Lab-module
+• Kwaliteitsoordeel gebruikt nu meerdere gewogen categorieën in plaats van één cosmetische score
+
+### Safety
+
+• De simulator analyseert uitsluitend lokale demo- en profielkwaliteit
+• Het rapport claimt niet dat externe detectiesystemen kunnen worden omzeild
+• Er worden geen externe applicaties bestuurd tijdens batchruns
+
 ## 0.1.0
 
 ### Added
